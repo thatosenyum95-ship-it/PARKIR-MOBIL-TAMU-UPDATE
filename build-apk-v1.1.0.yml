@@ -1,0 +1,1075 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # =========================================================
+      # 1. CHECKOUT
+      # =========================================================
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+
+      # =========================================================
+      # 2. NODE
+      # =========================================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+
+      # =========================================================
+      # 3. JAVA
+      # =========================================================
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+
+      # =========================================================
+      # 4. VERIFY PROJECT STRUCTURE
+      #
+      # Project asli memakai:
+      # www/index.html
+      # BUKAN index.html di root.
+      # =========================================================
+      - name: Verify project structure
+        shell: bash
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "PROJECT STRUCTURE"
+          echo "========================================"
+
+          pwd
+          ls -la
+
+          echo ""
+          echo "www/"
+          ls -la www 2>/dev/null || true
+
+          echo ""
+          echo "assets/"
+          ls -la assets 2>/dev/null || true
+
+          echo ""
+          echo "src/"
+          ls -la src 2>/dev/null || true
+
+          echo ""
+          echo "Checking required files..."
+
+          FAILED=0
+
+          required_file() {
+            FILE="$1"
+
+            if [ -f "$FILE" ]; then
+              echo "OK       $FILE"
+            else
+              echo "MISSING  $FILE"
+              FAILED=1
+            fi
+          }
+
+          # File inti yang benar-benar wajib untuk proses build.
+          required_file "www/index.html"
+          required_file "package.json"
+          required_file "capacitor.config.ts"
+          required_file "google-services.json"
+          required_file "src/native-bridge.js"
+
+          # Asset visual/suara TIDAK lagi dijadikan hard-fail.
+          # Workflow akan menyiapkan fallback pada langkah berikutnya.
+          if [ -f "assets/icon.png" ]; then
+            echo "OK       assets/icon.png"
+          elif [ -f "icon.png" ]; then
+            echo "FOUND    icon.png (root)"
+          elif [ -f "www/icon.png" ]; then
+            echo "FOUND    www/icon.png"
+          else
+            echo "WARNING  icon CEK VAR tidak ditemukan."
+            echo "         Build tetap dilanjutkan dengan icon fallback."
+          fi
+
+          if [ -f "assets/push_icon.png" ]; then
+            echo "OK       assets/push_icon.png"
+          else
+            echo "WARNING  assets/push_icon.png tidak ada; fallback akan dibuat."
+          fi
+
+          if [ -f "assets/notif.wav" ]; then
+            echo "OK       assets/notif.wav"
+          else
+            echo "WARNING  assets/notif.wav tidak ada; suara fallback akan dibuat."
+          fi
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo ""
+            echo "Ada file wajib yang hilang."
+            exit 1
+          fi
+
+          echo ""
+          echo "Project structure OK."
+
+
+      # =========================================================
+      # 5. VERIFY FIREBASE PROJECT
+      # =========================================================
+      - name: Verify Firebase config
+        shell: bash
+        run: |
+          set -e
+
+          PROJECT_ID=$(node - <<'NODE'
+          const fs = require("fs");
+
+          const data = JSON.parse(
+            fs.readFileSync("google-services.json", "utf8")
+          );
+
+          process.stdout.write(
+            data.project_info?.project_id || ""
+          );
+          NODE
+          )
+
+          echo "Firebase project: $PROJECT_ID"
+
+          if [ "$PROJECT_ID" != "parkir-mobil" ]; then
+            echo "ERROR: project Firebase harus parkir-mobil."
+            exit 1
+          fi
+
+          PACKAGE_NAME=$(node - <<'NODE'
+          const fs = require("fs");
+
+          const data = JSON.parse(
+            fs.readFileSync("google-services.json", "utf8")
+          );
+
+          const client = data.client || [];
+
+          const found = client.find(
+            x => x.client_info?.android_client_info?.package_name ===
+                 "com.parkiranmobiltamu.app"
+          );
+
+          process.stdout.write(
+            found ? "com.parkiranmobiltamu.app" : ""
+          );
+          NODE
+          )
+
+          if [ "$PACKAGE_NAME" != "com.parkiranmobiltamu.app" ]; then
+            echo "ERROR: Android package com.parkiranmobiltamu.app tidak ditemukan di google-services.json."
+            exit 1
+          fi
+
+          echo "Firebase config OK."
+
+
+      # =========================================================
+      # 6. INSTALL DEPENDENCIES
+      #
+      # Jangan bergantung pada script build:native dari package.json.
+      # =========================================================
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -e
+
+          npm install --no-audit --no-fund
+
+          # Pastikan semua plugin yang dipakai native-bridge tersedia.
+          npm install \
+            @capacitor/core@8.0.0 \
+            @capacitor/cli@8.0.0 \
+            @capacitor/android@8.0.0 \
+            @capacitor/camera@8.2.4 \
+            @capacitor/local-notifications@8.3.1 \
+            @capacitor-firebase/messaging@8.5.2 \
+            @capgo/capacitor-speech-recognition@8.3.2 \
+            @capgo/capacitor-speech-synthesis@8.0.22 \
+            esbuild@0.25.0 \
+            --save \
+            --no-audit \
+            --no-fund
+
+          echo "Dependencies OK."
+
+
+      # =========================================================
+      # 7. NORMALIZE OPTIONAL ASSETS
+      # =========================================================
+      - name: Normalize app assets
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p assets
+
+          # Terima beberapa lokasi umum untuk icon agar workflow tidak
+          # gagal hanya karena file di-upload di root/www.
+          if [ ! -f assets/icon.png ]; then
+            if [ -f icon.png ]; then
+              cp icon.png assets/icon.png
+              echo "Icon ditemukan di root -> assets/icon.png"
+            elif [ -f www/icon.png ]; then
+              cp www/icon.png assets/icon.png
+              echo "Icon ditemukan di www -> assets/icon.png"
+            fi
+          fi
+
+          # Jika icon benar-benar tidak ada, buat PNG fallback sederhana.
+          # Ini hanya untuk menjaga build tetap berjalan; jika ingin icon
+          # CEK VAR asli, pastikan assets/icon.png ada di repository.
+          if [ ! -f assets/icon.png ]; then
+            python3 - <<'PY2'
+          import struct, zlib
+
+          w = h = 192
+          rows = []
+          for y in range(h):
+              row = bytearray([0])
+              for x in range(w):
+                  # latar gelap + lingkaran terang sederhana
+                  dx = x - w/2
+                  dy = y - h/2
+                  r = (dx*dx + dy*dy) ** 0.5
+                  if r < 78:
+                      px = (235, 235, 235, 255)
+                  else:
+                      px = (18, 18, 18, 255)
+                  row.extend(px)
+              rows.append(bytes(row))
+
+          def chunk(t, d):
+              return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t+d) & 0xffffffff)
+
+          raw = b''.join(rows)
+          png = b'\x89PNG\r\n\x1a\n'
+          png += chunk(b'IHDR', struct.pack('>IIBBBBB', w,h,8,6,0,0,0))
+          png += chunk(b'IDAT', zlib.compress(raw, 9))
+          png += chunk(b'IEND', b'')
+          open('assets/icon.png','wb').write(png)
+          print('Fallback icon dibuat.')
+          PY2
+          fi
+
+          # push_icon juga dibuat fallback dari icon utama bila belum ada.
+          if [ ! -f assets/push_icon.png ]; then
+            cp assets/icon.png assets/push_icon.png
+            echo "Fallback push icon dibuat dari icon utama."
+          fi
+
+          echo "Asset normalization OK."
+
+
+      # =========================================================
+      # 8. BUNDLE NATIVE BRIDGE
+      #
+      # Ini menggantikan:
+      # script build native lama
+      #
+      # Jadi tidak peduli script build:native ada atau tidak.
+      # =========================================================
+      - name: Bundle native bridge
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p www
+
+          npx esbuild src/native-bridge.js \
+            --bundle \
+            --format=iife \
+            --platform=browser \
+            --outfile=www/native-bridge.js
+
+          test -s www/native-bridge.js
+
+          echo "Native bridge berhasil dibundle."
+          ls -lh www/native-bridge.js
+
+
+      # =========================================================
+      # 9. VERIFY HTML NATIVE BRIDGE
+      # =========================================================
+      - name: Verify web assets
+        shell: bash
+        run: |
+          set -e
+
+          test -f www/index.html
+          test -f www/native-bridge.js
+
+          grep -q 'native-bridge.js' www/index.html
+
+          echo "www/index.html OK"
+          echo "www/native-bridge.js OK"
+
+
+      # =========================================================
+      # 10. CREATE ANDROID PLATFORM
+      #
+      # Jika android tidak ada / rusak / gradlew hilang,
+      # buat ulang.
+      # =========================================================
+      - name: Create Android platform
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f android/gradlew ]; then
+
+            echo "Android platform belum lengkap."
+
+            if [ -d android ]; then
+              rm -rf android
+            fi
+
+            npx cap add android
+
+          else
+
+            echo "Android platform sudah ada."
+
+          fi
+
+          test -f android/gradlew
+
+          echo "Android platform OK."
+
+
+      # =========================================================
+      # 11. FIREBASE ANDROID CONFIG
+      # =========================================================
+      - name: Install Firebase Android config
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p android/app
+
+          cp google-services.json \
+            android/app/google-services.json
+
+          test -f android/app/google-services.json
+
+          echo "Firebase Android config OK."
+
+
+      # =========================================================
+      # 12. CONFIGURE GOOGLE SERVICES
+      # =========================================================
+      - name: Configure Google Services Gradle plugin
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("android")
+          root_gradle = root / "build.gradle"
+          app_gradle = root / "app" / "build.gradle"
+
+          if not root_gradle.exists():
+              raise SystemExit("android/build.gradle tidak ditemukan")
+
+          if not app_gradle.exists():
+              raise SystemExit("android/app/build.gradle tidak ditemukan")
+
+          root_text = root_gradle.read_text()
+
+          google_line = (
+              "classpath 'com.google.gms:google-services:4.4.4'"
+          )
+
+          if google_line not in root_text:
+
+              marker = (
+                  "classpath 'com.android.tools.build:gradle:8.13.0'"
+              )
+
+              if marker in root_text:
+                  root_text = root_text.replace(
+                      marker,
+                      marker + "\n\n              " + google_line,
+                      1
+                  )
+              elif "buildscript {" in root_text:
+
+                  insert = """
+              dependencies {
+                  classpath 'com.google.gms:google-services:4.4.4'
+              }
+          """
+
+                  pos = root_text.find("buildscript {")
+                  end = root_text.find("}", pos)
+
+                  if end >= 0:
+                      root_text = (
+                          root_text[:end + 1]
+                          + "\n"
+                          + insert
+                          + root_text[end + 1:]
+                      )
+                  else:
+                      raise SystemExit(
+                          "buildscript Gradle tidak valid"
+                      )
+              else:
+                  raise SystemExit(
+                      "Tidak menemukan tempat Google Services plugin"
+                  )
+
+              root_gradle.write_text(root_text)
+
+          app_text = app_gradle.read_text()
+
+          if "com.google.gms.google-services" not in app_text:
+
+              marker = (
+                  "apply plugin: 'com.android.application'"
+              )
+
+              if marker in app_text:
+                  app_text = app_text.replace(
+                      marker,
+                      marker
+                      + "\napply plugin: 'com.google.gms.google-services'",
+                      1
+                  )
+              else:
+                  app_text += (
+                      "\napply plugin: "
+                      "'com.google.gms.google-services'\n"
+                  )
+
+              app_gradle.write_text(app_text)
+
+          print("Google Services plugin configured.")
+          PY
+
+
+      # =========================================================
+      # 13. INSTALL IMAGEMAGICK
+      # =========================================================
+      - name: Install ImageMagick
+        shell: bash
+        run: |
+          set -e
+
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+          convert --version
+
+
+      # =========================================================
+      # 14. GENERATE CEK VAR ICON
+      #
+      # Kalau script project tersedia, gunakan script asli.
+      # =========================================================
+      - name: Generate CEK VAR launcher icon
+        shell: bash
+        run: |
+          set -e
+
+          if [ -f scripts/generate-icons.sh ]; then
+
+            chmod +x scripts/generate-icons.sh
+            bash scripts/generate-icons.sh
+
+          else
+
+            echo "generate-icons.sh tidak ada."
+            echo "Membuat icon langsung dari assets/icon.png."
+
+            RES="android/app/src/main/res"
+
+            mkdir -p "$RES/mipmap-mdpi"
+            mkdir -p "$RES/mipmap-hdpi"
+            mkdir -p "$RES/mipmap-xhdpi"
+            mkdir -p "$RES/mipmap-xxhdpi"
+            mkdir -p "$RES/mipmap-xxxhdpi"
+
+            convert assets/icon.png -resize 48x48 \
+              "$RES/mipmap-mdpi/ic_launcher.png"
+
+            convert assets/icon.png -resize 72x72 \
+              "$RES/mipmap-hdpi/ic_launcher.png"
+
+            convert assets/icon.png -resize 96x96 \
+              "$RES/mipmap-xhdpi/ic_launcher.png"
+
+            convert assets/icon.png -resize 144x144 \
+              "$RES/mipmap-xxhdpi/ic_launcher.png"
+
+            convert assets/icon.png -resize 192x192 \
+              "$RES/mipmap-xxxhdpi/ic_launcher.png"
+
+            for D in mdpi hdpi xhdpi xxhdpi xxxhdpi
+            do
+              cp \
+                "$RES/mipmap-$D/ic_launcher.png" \
+                "$RES/mipmap-$D/ic_launcher_round.png"
+            done
+
+          fi
+
+          echo "Launcher icon selesai."
+
+
+      # =========================================================
+      # 15. FORCE CEK VAR ICON IN MANIFEST
+      # =========================================================
+      - name: Force CEK VAR app icon
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path(
+              "android/app/src/main/AndroidManifest.xml"
+          )
+
+          s = p.read_text()
+
+          start = s.find("<application")
+
+          if start < 0:
+              raise SystemExit(
+                  "application tag tidak ditemukan"
+              )
+
+          end = s.find(">", start)
+
+          if end < 0:
+              raise SystemExit(
+                  "application tag rusak"
+              )
+
+          tag = s[start:end]
+
+          tag = re.sub(
+              r'\s+android:icon="[^"]*"',
+              '',
+              tag
+          )
+
+          tag = re.sub(
+              r'\s+android:roundIcon="[^"]*"',
+              '',
+              tag
+          )
+
+          tag += (
+              ' android:icon="@mipmap/ic_launcher"'
+              ' android:roundIcon="@mipmap/ic_launcher_round"'
+          )
+
+          s = s[:start] + tag + s[end:]
+
+          p.write_text(s)
+          PY
+
+          grep -n \
+            'android:icon\|android:roundIcon' \
+            android/app/src/main/AndroidManifest.xml
+
+
+      # =========================================================
+      # 16. VERIFY CEK VAR ICON
+      # =========================================================
+      - name: Verify CEK VAR launcher icon
+        shell: bash
+        run: |
+          set -e
+
+          for D in mdpi hdpi xhdpi xxhdpi xxxhdpi
+          do
+            test -f \
+              "android/app/src/main/res/mipmap-$D/ic_launcher.png"
+
+            test -f \
+              "android/app/src/main/res/mipmap-$D/ic_launcher_round.png"
+          done
+
+          if find android/app/src/main/res \
+            -type f \
+            \( -name 'ic_launcher.xml' \
+            -o -name 'ic_launcher_round.xml' \) \
+            | grep -q .
+          then
+            echo "ERROR: adaptive launcher icon ditemukan."
+            exit 1
+          fi
+
+          echo "CEK VAR launcher icon OK."
+
+
+      # =========================================================
+      # 17. PREPARE NOTIFICATION SOUND
+      # =========================================================
+      - name: Prepare notification sound
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p \
+            android/app/src/main/res/raw
+
+          if [ -f assets/notif.wav ]; then
+
+            cp assets/notif.wav \
+              android/app/src/main/res/raw/notif.wav
+
+          else
+
+            echo "Membuat fallback notification sound..."
+
+            python3 - <<'PY'
+          import wave
+          import math
+          import struct
+
+          filename = (
+              "android/app/src/main/res/raw/notif.wav"
+          )
+
+          rate = 44100
+          duration = 0.45
+          volume = 0.35
+
+          frames = []
+
+          for i in range(
+              int(rate * duration)
+          ):
+              t = i / rate
+
+              if t < 0.22:
+                  freq = 880
+              else:
+                  freq = 1175
+
+              sample = int(
+                  32767
+                  * volume
+                  * math.sin(
+                      2 * math.pi * freq * t
+                  )
+              )
+
+              frames.append(
+                  struct.pack("<h", sample)
+              )
+
+          with wave.open(filename, "wb") as wav:
+              wav.setnchannels(1)
+              wav.setsampwidth(2)
+              wav.setframerate(rate)
+              wav.writeframes(
+                  b"".join(frames)
+              )
+
+          print("Fallback sound OK.")
+          PY
+
+          fi
+
+          test -f \
+            android/app/src/main/res/raw/notif.wav
+
+
+      # =========================================================
+      # 18. PREPARE FCM ICON
+      # =========================================================
+      - name: Prepare FCM notification icon
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p \
+            android/app/src/main/res/drawable
+
+          if [ -f assets/push_icon.png ]; then
+            SOURCE="assets/push_icon.png"
+          else
+            SOURCE="assets/icon.png"
+          fi
+
+          cp "$SOURCE" \
+            android/app/src/main/res/drawable/push_icon.png
+
+          test -f \
+            android/app/src/main/res/drawable/push_icon.png
+
+
+      # =========================================================
+      # 19. CONFIGURE FCM RESOURCES
+      # =========================================================
+      - name: Configure FCM Android resources
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p \
+            android/app/src/main/res/values
+
+          cat > \
+            android/app/src/main/res/values/fcm_strings.xml \
+            <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="default_notification_channel_id">pengumuman_fcm_v3</string>
+          </resources>
+          XML
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path(
+              "android/app/src/main/AndroidManifest.xml"
+          )
+
+          s = p.read_text()
+
+          permission = (
+              '<uses-permission '
+              'android:name="android.permission.POST_NOTIFICATIONS" />'
+          )
+
+          if permission not in s:
+
+              m = s.find("<manifest")
+
+              if m < 0:
+                  raise SystemExit(
+                      "manifest tag tidak ditemukan"
+                  )
+
+              end = s.find(">", m)
+
+              s = (
+                  s[:end + 1]
+                  + "\n    "
+                  + permission
+                  + "\n"
+                  + s[end + 1:]
+              )
+
+          icon_meta = (
+              '<meta-data '
+              'android:name="com.google.firebase.messaging.default_notification_icon" '
+              'android:resource="@drawable/push_icon" />'
+          )
+
+          channel_meta = (
+              '<meta-data '
+              'android:name="com.google.firebase.messaging.default_notification_channel_id" '
+              'android:resource="@string/default_notification_channel_id" />'
+          )
+
+          if "com.google.firebase.messaging.default_notification_icon" not in s:
+
+              pos = s.find("<application")
+
+              if pos < 0:
+                  raise SystemExit(
+                      "application tag tidak ditemukan"
+                  )
+
+              end = s.find(">", pos)
+
+              s = (
+                  s[:end + 1]
+                  + "\n        "
+                  + icon_meta
+                  + "\n        "
+                  + channel_meta
+                  + "\n"
+                  + s[end + 1:]
+              )
+
+          p.write_text(s)
+          PY
+
+
+      # =========================================================
+      # 20B. CREATE SECURE APK UPDATER PLUGIN
+      # =========================================================
+      - name: Configure secure APK updater
+        shell: bash
+        run: |
+          set -e
+
+          MAIN_DIR="android/app/src/main/java/com/parkiranmobiltamu/app"
+          MAIN="$MAIN_DIR/AppUpdater.java"
+          mkdir -p "$MAIN_DIR"
+
+          cat > "$MAIN" <<'JAVA'
+          package com.parkiranmobiltamu.app;
+
+          import android.content.Intent;
+          import android.content.pm.PackageInfo;
+          import android.content.pm.PackageManager;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.provider.Settings;
+          import android.content.Context;
+          import androidx.core.content.FileProvider;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import com.getcapacitor.annotation.PluginMethod;
+          import java.io.*;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.security.MessageDigest;
+          import java.util.Locale;
+          import java.util.concurrent.Executors;
+
+          @CapacitorPlugin(name = "AppUpdater")
+          public class AppUpdater extends Plugin {
+              @PluginMethod
+              public void downloadAndInstall(PluginCall call) {
+                  final String urlText = call.getString("url", "");
+                  final String expectedSha256 = call.getString("sha256", "");
+                  final String expectedPackage = call.getString("packageName", "com.parkiranmobiltamu.app");
+                  final long expectedVersionCode = call.getLong("versionCode", 0L);
+
+                  if (!urlText.startsWith("https://")) { call.reject("Update hanya boleh melalui HTTPS."); return; }
+                  try {
+                      String host = new URL(urlText).getHost().toLowerCase(Locale.US);
+                      if (!host.equals("github.com") && !host.equals("www.github.com")) { call.reject("Sumber APK tidak diizinkan."); return; }
+                  } catch (Exception e) { call.reject("URL update tidak valid."); return; }
+                  if (!expectedPackage.equals(getContext().getPackageName())) { call.reject("Package APK tidak cocok."); return; }
+
+                  Executors.newSingleThreadExecutor().execute(() -> {
+                      File apk = null;
+                      try {
+                          if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
+                              Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
+                              settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              getContext().startActivity(settings);
+                              call.reject("IZIN_INSTALL_REQUIRED", "Izinkan pemasangan aplikasi dari sumber ini, lalu tekan UPDATE APK lagi.");
+                              return;
+                          }
+
+                          apk = downloadApk(urlText);
+                          if (!expectedSha256.isEmpty() && !sha256(apk).equalsIgnoreCase(expectedSha256)) {
+                              apk.delete(); call.reject("HASH_MISMATCH", "SHA-256 APK tidak cocok. Update dibatalkan."); return;
+                          }
+
+                          PackageManager pm = getContext().getPackageManager();
+                          PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_META_DATA);
+                          if (info == null || !expectedPackage.equals(info.packageName)) {
+                              apk.delete(); call.reject("PACKAGE_MISMATCH", "Package APK tidak cocok. Update dibatalkan."); return;
+                          }
+                          long downloadedVersion = Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
+                          if (expectedVersionCode > 0 && downloadedVersion != expectedVersionCode) {
+                              apk.delete(); call.reject("VERSION_MISMATCH", "VersionCode APK tidak cocok dengan manifest update."); return;
+                          }
+
+                          File installFile = new File(getContext().getCacheDir(), "parkir-update.apk");
+                          if (installFile.exists()) installFile.delete();
+                          if (!apk.renameTo(installFile)) { copyFile(apk, installFile); apk.delete(); }
+
+                          Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", installFile);
+                          Intent intent = new Intent(Intent.ACTION_VIEW);
+                          intent.setDataAndType(uri, "application/vnd.android.package-archive");
+                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                          getContext().startActivity(intent);
+                          call.resolve();
+                      } catch (Exception e) {
+                          if (apk != null && apk.exists()) apk.delete();
+                          call.reject("UPDATE_FAILED", e.getMessage() == null ? "Download/update gagal." : e.getMessage());
+                      }
+                  });
+              }
+
+              private File downloadApk(String urlText) throws Exception {
+                  File dir = new File(getContext().getCacheDir(), "updates");
+                  if (!dir.exists() && !dir.mkdirs()) throw new Exception("Folder update tidak dapat dibuat.");
+                  File out = new File(dir, "parkir-update-download.apk");
+                  HttpURLConnection c = (HttpURLConnection)new URL(urlText).openConnection();
+                  c.setInstanceFollowRedirects(true); c.setConnectTimeout(15000); c.setReadTimeout(30000);
+                  c.connect();
+                  if (c.getResponseCode() < 200 || c.getResponseCode() >= 300) throw new Exception("Server update HTTP " + c.getResponseCode());
+                  long len = c.getContentLengthLong(); if (len > 60L*1024L*1024L) throw new Exception("Ukuran APK terlalu besar.");
+                  try (InputStream in=c.getInputStream(); FileOutputStream outStream=new FileOutputStream(out)) {
+                      byte[] b=new byte[8192]; int n; long total=0;
+                      while((n=in.read(b))!=-1){ total+=n; if(total>60L*1024L*1024L) throw new Exception("Ukuran APK melebihi batas keamanan."); outStream.write(b,0,n); }
+                  } finally { c.disconnect(); }
+                  return out;
+              }
+
+              private String sha256(File f) throws Exception {
+                  MessageDigest d=MessageDigest.getInstance("SHA-256");
+                  try(InputStream in=new FileInputStream(f)){ byte[] b=new byte[8192]; int n; while((n=in.read(b))!=-1)d.update(b,0,n); }
+                  StringBuilder s=new StringBuilder(); for(byte x:d.digest()) s.append(String.format(Locale.US,"%02x",x)); return s.toString();
+              }
+
+              private void copyFile(File a, File b) throws Exception {
+                  try(InputStream in=new FileInputStream(a); OutputStream out=new FileOutputStream(b)){ byte[] x=new byte[8192]; int n; while((n=in.read(x))!=-1)out.write(x,0,n); }
+              }
+          }
+          JAVA
+
+          test -f "$MAIN"
+
+          python3 - <<'PY2'
+          from pathlib import Path
+          p=Path("android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          permission='<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if permission not in s:
+              pos=s.find("<manifest"); end=s.find(">",pos); s=s[:end+1]+"\\n    "+permission+"\\n"+s[end+1:]
+          provider='        <provider\n              android:name=\"androidx.core.content.FileProvider\"\n              android:authorities=\"${applicationId}.fileprovider\"\n              android:exported=\"false\"\n              android:grantUriPermissions=\"true\">\n              <meta-data\n                  android:name=\"android.support.FILE_PROVIDER_PATHS\"\n                  android:resource=\"@xml/file_paths\" />\n          </provider>'
+          if "${applicationId}.fileprovider" not in s:
+              pos=s.find("</application>"); s=s[:pos]+provider+"\\n"+s[pos:]
+          p.write_text(s)
+          PY2
+
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="update_cache" path="updates/" />
+              <cache-path name="root_cache" path="." />
+          </paths>
+          XML
+
+
+      # =========================================================
+      # 21. CAPACITOR SYNC
+      # =========================================================
+      - name: Sync Capacitor plugins and web assets
+        shell: bash
+        run: |
+          set -e
+
+          npx cap sync android
+
+
+      # =========================================================
+      # 22. VERIFY FINAL WEB ASSETS
+      # =========================================================
+      - name: Verify final web assets
+        shell: bash
+        run: |
+          set -e
+
+          test -f www/index.html
+          test -f www/native-bridge.js
+
+          echo "Final web assets OK."
+
+
+      # =========================================================
+      # 23. VERIFY GRADLE WRAPPER
+      # =========================================================
+      - name: Verify Gradle wrapper
+        shell: bash
+        run: |
+          set -e
+
+          test -f android/gradlew
+          test -f android/gradle/wrapper/gradle-wrapper.jar
+          test -f android/gradle/wrapper/gradle-wrapper.properties
+
+          chmod +x android/gradlew
+
+          echo "Gradle wrapper OK."
+
+
+      # =========================================================
+      # 24. BUILD DEBUG APK
+      # =========================================================
+      - name: Build debug APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -e
+
+          chmod +x gradlew
+
+      # =========================================================
+      # FORCE UPDATE APP VERSION — v1.1.0 / versionCode 2
+      # =========================================================
+      - name: Set app version for update system
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY2'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          if re.search(r"versionCode\s+\d+", s):
+              s = re.sub(r"versionCode\s+\d+", "versionCode 2", s, count=1)
+          else:
+              s = s.replace("defaultConfig {", "defaultConfig {\n        versionCode 2", 1)
+          if re.search(r"versionName\s+['\"][^'\"]+['\"]", s):
+              s = re.sub(r"versionName\s+['\"][^'\"]+['\"]", 'versionName "1.1.0"', s, count=1)
+          else:
+              s = s.replace("defaultConfig {", 'defaultConfig {\n        versionName "1.1.0"', 1)
+          p.write_text(s)
+          PY2
+          grep -n "versionCode\|versionName" android/app/build.gradle | head -10
+
+
+          ./gradlew assembleDebug \
+            --no-daemon \
+            --stacktrace
+
+
+      # =========================================================
+      # 25. FIND APK
+      # =========================================================
+      - name: Find APK
+        shell: bash
+        run: |
+          set -e
+
+          find \
+            android/app/build/outputs/apk \
+            -type f \
+            -name "*.apk" \
+            -print
+
+
+      # =========================================================
+      # 26. UPLOAD APK
+      # =========================================================
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: parkir-mobil-tamu-v2.5-fcm-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
