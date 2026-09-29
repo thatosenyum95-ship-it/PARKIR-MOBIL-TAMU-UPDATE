@@ -23,16 +23,18 @@ jobs:
 
 
       # =========================================================
-      # 2. NODE
+      # 2. NODE.JS 22
+      # Capacitor 8 membutuhkan Node.js 22+
       # =========================================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
 
 
       # =========================================================
-      # 3. JAVA
+      # 3. JAVA 21
       # =========================================================
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -42,11 +44,7 @@ jobs:
 
 
       # =========================================================
-      # 4. VERIFY PROJECT STRUCTURE
-      #
-      # Project asli memakai:
-      # www/index.html
-      # BUKAN index.html di root.
+      # 4. VERIFY PROJECT
       # =========================================================
       - name: Verify project structure
         shell: bash
@@ -54,151 +52,94 @@ jobs:
           set -e
 
           echo "========================================"
-          echo "PROJECT STRUCTURE"
+          echo "PARKIR MOBIL TAMU"
+          echo "PROJECT CHECK"
           echo "========================================"
 
-          pwd
-          ls -la
+          test -f www/index.html
+          test -f package.json
+          test -f capacitor.config.ts
+          test -f google-services.json
+          test -f src/native-bridge.js
 
-          echo ""
-          echo "www/"
-          ls -la www 2>/dev/null || true
-
-          echo ""
-          echo "assets/"
-          ls -la assets 2>/dev/null || true
-
-          echo ""
-          echo "src/"
-          ls -la src 2>/dev/null || true
-
-          echo ""
-          echo "Checking required files..."
-
-          FAILED=0
-
-          required_file() {
-            FILE="$1"
-
-            if [ -f "$FILE" ]; then
-              echo "OK       $FILE"
-            else
-              echo "MISSING  $FILE"
-              FAILED=1
-            fi
-          }
-
-          # File inti yang benar-benar wajib untuk proses build.
-          required_file "www/index.html"
-          required_file "package.json"
-          required_file "capacitor.config.ts"
-          required_file "google-services.json"
-          required_file "src/native-bridge.js"
-
-          # Asset visual/suara TIDAK lagi dijadikan hard-fail.
-          # Workflow akan menyiapkan fallback pada langkah berikutnya.
-          if [ -f "assets/icon.png" ]; then
-            echo "OK       assets/icon.png"
-          elif [ -f "icon.png" ]; then
-            echo "FOUND    icon.png (root)"
-          elif [ -f "www/icon.png" ]; then
-            echo "FOUND    www/icon.png"
-          else
-            echo "WARNING  icon CEK VAR tidak ditemukan."
-            echo "         Build tetap dilanjutkan dengan icon fallback."
-          fi
-
-          if [ -f "assets/push_icon.png" ]; then
-            echo "OK       assets/push_icon.png"
-          else
-            echo "WARNING  assets/push_icon.png tidak ada; fallback akan dibuat."
-          fi
-
-          if [ -f "assets/notif.wav" ]; then
-            echo "OK       assets/notif.wav"
-          else
-            echo "WARNING  assets/notif.wav tidak ada; suara fallback akan dibuat."
-          fi
-
-          if [ "$FAILED" -ne 0 ]; then
-            echo ""
-            echo "Ada file wajib yang hilang."
-            exit 1
-          fi
+          echo "OK: www/index.html"
+          echo "OK: package.json"
+          echo "OK: capacitor.config.ts"
+          echo "OK: google-services.json"
+          echo "OK: src/native-bridge.js"
 
           echo ""
           echo "Project structure OK."
 
 
       # =========================================================
-      # 5. VERIFY FIREBASE PROJECT
+      # 5. VERIFY FIREBASE CONFIG
       # =========================================================
       - name: Verify Firebase config
         shell: bash
         run: |
           set -e
 
-          PROJECT_ID=$(node - <<'NODE'
+          node <<'NODE'
           const fs = require("fs");
 
           const data = JSON.parse(
             fs.readFileSync("google-services.json", "utf8")
           );
 
-          process.stdout.write(
-            data.project_info?.project_id || ""
+          const projectId =
+            data.project_info?.project_id || "";
+
+          if (projectId !== "parkir-mobil") {
+            throw new Error(
+              "Firebase project harus parkir-mobil"
+            );
+          }
+
+          const clients = data.client || [];
+
+          const found = clients.some(
+            x =>
+              x.client_info?.android_client_info?.package_name ===
+              "com.parkiranmobiltamu.app"
           );
+
+          if (!found) {
+            throw new Error(
+              "Package com.parkiranmobiltamu.app tidak ditemukan di google-services.json"
+            );
+          }
+
+          console.log(
+            "Firebase project:",
+            projectId
+          );
+
+          console.log(
+            "Android package: com.parkiranmobiltamu.app"
+          );
+
+          console.log("Firebase config OK.");
           NODE
-          )
-
-          echo "Firebase project: $PROJECT_ID"
-
-          if [ "$PROJECT_ID" != "parkir-mobil" ]; then
-            echo "ERROR: project Firebase harus parkir-mobil."
-            exit 1
-          fi
-
-          PACKAGE_NAME=$(node - <<'NODE'
-          const fs = require("fs");
-
-          const data = JSON.parse(
-            fs.readFileSync("google-services.json", "utf8")
-          );
-
-          const client = data.client || [];
-
-          const found = client.find(
-            x => x.client_info?.android_client_info?.package_name ===
-                 "com.parkiranmobiltamu.app"
-          );
-
-          process.stdout.write(
-            found ? "com.parkiranmobiltamu.app" : ""
-          );
-          NODE
-          )
-
-          if [ "$PACKAGE_NAME" != "com.parkiranmobiltamu.app" ]; then
-            echo "ERROR: Android package com.parkiranmobiltamu.app tidak ditemukan di google-services.json."
-            exit 1
-          fi
-
-          echo "Firebase config OK."
 
 
       # =========================================================
       # 6. INSTALL DEPENDENCIES
-      #
-      # Jangan bergantung pada script build:native dari package.json.
       # =========================================================
       - name: Install dependencies
         shell: bash
         run: |
           set -e
 
-          npm install --no-audit --no-fund
+          echo "Installing npm dependencies..."
 
-          # Pastikan semua plugin yang dipakai native-bridge tersedia.
+          npm install \
+            --no-audit \
+            --no-fund
+
+          echo ""
+          echo "Ensuring required packages..."
+
           npm install \
             @capacitor/core@8.0.0 \
             @capacitor/cli@8.0.0 \
@@ -208,16 +149,49 @@ jobs:
             @capacitor-firebase/messaging@8.5.2 \
             @capgo/capacitor-speech-recognition@8.3.2 \
             @capgo/capacitor-speech-synthesis@8.0.22 \
+            firebase@12.19.0 \
             esbuild@0.25.0 \
+            typescript@5.9.3 \
             --save \
             --no-audit \
             --no-fund
 
+          echo ""
+          echo "Installed versions:"
+          npx cap --version
+          npx esbuild --version
+          npx tsc --version
+
+          echo ""
           echo "Dependencies OK."
 
 
       # =========================================================
-      # 7. NORMALIZE OPTIONAL ASSETS
+      # 7. VERIFY CAPACITOR CONFIG
+      # =========================================================
+      - name: Verify Capacitor config
+        shell: bash
+        run: |
+          set -e
+
+          echo "capacitor.config.ts:"
+          cat capacitor.config.ts
+
+          grep -q "com.parkiranmobiltamu.app" \
+            capacitor.config.ts
+
+          grep -q "PARKIR MOBIL TAMU" \
+            capacitor.config.ts
+
+          grep -q "webDir: 'www'" \
+            capacitor.config.ts
+
+          echo ""
+          echo "Capacitor config OK."
+
+
+      # =========================================================
+      # 8. NORMALIZE ASSETS
       # =========================================================
       - name: Normalize app assets
         shell: bash
@@ -226,70 +200,129 @@ jobs:
 
           mkdir -p assets
 
-          # Terima beberapa lokasi umum untuk icon agar workflow tidak
-          # gagal hanya karena file di-upload di root/www.
+          # -----------------------------------------------------
+          # APP ICON
+          # -----------------------------------------------------
           if [ ! -f assets/icon.png ]; then
+
             if [ -f icon.png ]; then
               cp icon.png assets/icon.png
-              echo "Icon ditemukan di root -> assets/icon.png"
+
             elif [ -f www/icon.png ]; then
               cp www/icon.png assets/icon.png
-              echo "Icon ditemukan di www -> assets/icon.png"
+
             fi
+
           fi
 
-          # Jika icon benar-benar tidak ada, buat PNG fallback sederhana.
-          # Ini hanya untuk menjaga build tetap berjalan; jika ingin icon
-          # CEK VAR asli, pastikan assets/icon.png ada di repository.
-          if [ ! -f assets/icon.png ]; then
-            python3 - <<'PY2'
-          import struct, zlib
 
-          w = h = 192
+          # -----------------------------------------------------
+          # FALLBACK ICON
+          # -----------------------------------------------------
+          if [ ! -f assets/icon.png ]; then
+
+            echo "Creating fallback icon..."
+
+            python3 <<'PY'
+          import struct
+          import zlib
+
+          width = 192
+          height = 192
+
           rows = []
-          for y in range(h):
+
+          for y in range(height):
+
               row = bytearray([0])
-              for x in range(w):
-                  # latar gelap + lingkaran terang sederhana
-                  dx = x - w/2
-                  dy = y - h/2
-                  r = (dx*dx + dy*dy) ** 0.5
-                  if r < 78:
-                      px = (235, 235, 235, 255)
+
+              for x in range(width):
+
+                  dx = x - width / 2
+                  dy = y - height / 2
+
+                  radius = (dx * dx + dy * dy) ** 0.5
+
+                  if radius < 78:
+                      pixel = (235, 235, 235, 255)
                   else:
-                      px = (18, 18, 18, 255)
-                  row.extend(px)
+                      pixel = (18, 18, 18, 255)
+
+                  row.extend(pixel)
+
               rows.append(bytes(row))
 
-          def chunk(t, d):
-              return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t+d) & 0xffffffff)
 
-          raw = b''.join(rows)
-          png = b'\x89PNG\r\n\x1a\n'
-          png += chunk(b'IHDR', struct.pack('>IIBBBBB', w,h,8,6,0,0,0))
-          png += chunk(b'IDAT', zlib.compress(raw, 9))
-          png += chunk(b'IEND', b'')
-          open('assets/icon.png','wb').write(png)
-          print('Fallback icon dibuat.')
-          PY2
+          def chunk(kind, data):
+
+              return (
+                  struct.pack(">I", len(data))
+                  + kind
+                  + data
+                  + struct.pack(
+                      ">I",
+                      zlib.crc32(kind + data)
+                      & 0xffffffff
+                  )
+              )
+
+
+          raw = b"".join(rows)
+
+          png = b"\x89PNG\r\n\x1a\n"
+
+          png += chunk(
+              b"IHDR",
+              struct.pack(
+                  ">IIBBBBB",
+                  width,
+                  height,
+                  8,
+                  6,
+                  0,
+                  0,
+                  0
+              )
+          )
+
+          png += chunk(
+              b"IDAT",
+              zlib.compress(raw, 9)
+          )
+
+          png += chunk(
+              b"IEND",
+              b""
+          )
+
+          with open(
+              "assets/icon.png",
+              "wb"
+          ) as f:
+              f.write(png)
+
+          print("Fallback icon created.")
+          PY
+
           fi
 
-          # push_icon juga dibuat fallback dari icon utama bila belum ada.
+
+          # -----------------------------------------------------
+          # PUSH ICON
+          # -----------------------------------------------------
           if [ ! -f assets/push_icon.png ]; then
             cp assets/icon.png assets/push_icon.png
-            echo "Fallback push icon dibuat dari icon utama."
           fi
 
-          echo "Asset normalization OK."
+
+          echo ""
+          echo "Assets OK."
+
+          ls -lh assets/
 
 
       # =========================================================
-      # 8. BUNDLE NATIVE BRIDGE
-      #
-      # Ini menggantikan:
-      # script build native lama
-      #
-      # Jadi tidak peduli script build:native ada atau tidak.
+      # 9. BUNDLE NATIVE BRIDGE
       # =========================================================
       - name: Bundle native bridge
         shell: bash
@@ -298,7 +331,8 @@ jobs:
 
           mkdir -p www
 
-          npx esbuild src/native-bridge.js \
+          npx esbuild \
+            src/native-bridge.js \
             --bundle \
             --format=iife \
             --platform=browser \
@@ -306,12 +340,14 @@ jobs:
 
           test -s www/native-bridge.js
 
-          echo "Native bridge berhasil dibundle."
+          echo ""
+          echo "Native bridge bundled successfully."
+
           ls -lh www/native-bridge.js
 
 
       # =========================================================
-      # 9. VERIFY HTML NATIVE BRIDGE
+      # 10. VERIFY WEB ASSETS
       # =========================================================
       - name: Verify web assets
         shell: bash
@@ -319,48 +355,37 @@ jobs:
           set -e
 
           test -f www/index.html
-          test -f www/native-bridge.js
+          test -s www/native-bridge.js
 
-          grep -q 'native-bridge.js' www/index.html
+          grep -q "native-bridge.js" \
+            www/index.html
 
-          echo "www/index.html OK"
-          echo "www/native-bridge.js OK"
+          echo "Web assets OK."
 
 
       # =========================================================
-      # 10. CREATE ANDROID PLATFORM
-      #
-      # Jika android tidak ada / rusak / gradlew hilang,
-      # buat ulang.
+      # 11. CREATE ANDROID PLATFORM
       # =========================================================
       - name: Create Android platform
         shell: bash
         run: |
           set -e
 
-          if [ ! -f android/gradlew ]; then
-
-            echo "Android platform belum lengkap."
-
-            if [ -d android ]; then
-              rm -rf android
-            fi
-
-            npx cap add android
-
+          if [ -d android ]; then
+            echo "Android folder already exists."
           else
-
-            echo "Android platform sudah ada."
-
+            echo "Creating Android platform..."
+            npx cap add android
           fi
 
           test -f android/gradlew
 
+          echo ""
           echo "Android platform OK."
 
 
       # =========================================================
-      # 11. FIREBASE ANDROID CONFIG
+      # 12. INSTALL FIREBASE CONFIG
       # =========================================================
       - name: Install Firebase Android config
         shell: bash
@@ -369,83 +394,89 @@ jobs:
 
           mkdir -p android/app
 
-          cp google-services.json \
+          cp \
+            google-services.json \
             android/app/google-services.json
 
-          test -f android/app/google-services.json
+          test -f \
+            android/app/google-services.json
 
-          echo "Firebase Android config OK."
+          echo "google-services.json installed."
 
 
       # =========================================================
-      # 12. CONFIGURE GOOGLE SERVICES
+      # 13. CONFIGURE GOOGLE SERVICES
       # =========================================================
       - name: Configure Google Services Gradle plugin
         shell: bash
         run: |
           set -e
 
-          python3 - <<'PY'
+          python3 <<'PY'
           from pathlib import Path
+          import re
 
           root = Path("android")
           root_gradle = root / "build.gradle"
           app_gradle = root / "app" / "build.gradle"
 
           if not root_gradle.exists():
-              raise SystemExit("android/build.gradle tidak ditemukan")
+              raise SystemExit(
+                  "android/build.gradle tidak ditemukan"
+              )
 
           if not app_gradle.exists():
-              raise SystemExit("android/app/build.gradle tidak ditemukan")
+              raise SystemExit(
+                  "android/app/build.gradle tidak ditemukan"
+              )
+
+
+          # =====================================================
+          # ROOT GRADLE
+          # =====================================================
 
           root_text = root_gradle.read_text()
 
-          google_line = (
+          google_plugin = (
               "classpath 'com.google.gms:google-services:4.4.4'"
           )
 
-          if google_line not in root_text:
+          if google_plugin not in root_text:
 
               marker = (
                   "classpath 'com.android.tools.build:gradle:8.13.0'"
               )
 
               if marker in root_text:
+
                   root_text = root_text.replace(
                       marker,
-                      marker + "\n\n              " + google_line,
+                      marker
+                      + "\n"
+                      + "        "
+                      + google_plugin,
                       1
                   )
-              elif "buildscript {" in root_text:
 
-                  insert = """
-              dependencies {
-                  classpath 'com.google.gms:google-services:4.4.4'
-              }
-          """
-
-                  pos = root_text.find("buildscript {")
-                  end = root_text.find("}", pos)
-
-                  if end >= 0:
-                      root_text = (
-                          root_text[:end + 1]
-                          + "\n"
-                          + insert
-                          + root_text[end + 1:]
-                      )
-                  else:
-                      raise SystemExit(
-                          "buildscript Gradle tidak valid"
-                      )
               else:
+
                   raise SystemExit(
-                      "Tidak menemukan tempat Google Services plugin"
+                      "Tidak menemukan Android Gradle Plugin "
+                      "di android/build.gradle"
                   )
 
               root_gradle.write_text(root_text)
 
+
+          # =====================================================
+          # APP GRADLE
+          # =====================================================
+
           app_text = app_gradle.read_text()
+
+          plugin_line = (
+              "apply plugin: 'com.google.gms.google-services'"
+          )
 
           if "com.google.gms.google-services" not in app_text:
 
@@ -454,26 +485,34 @@ jobs:
               )
 
               if marker in app_text:
+
                   app_text = app_text.replace(
                       marker,
                       marker
-                      + "\napply plugin: 'com.google.gms.google-services'",
+                      + "\n"
+                      + plugin_line,
                       1
                   )
+
               else:
-                  app_text += (
-                      "\napply plugin: "
-                      "'com.google.gms.google-services'\n"
+
+                  app_text = (
+                      plugin_line
+                      + "\n"
+                      + app_text
                   )
 
               app_gradle.write_text(app_text)
 
-          print("Google Services plugin configured.")
+
+          print(
+              "Google Services Gradle plugin configured."
+          )
           PY
 
 
       # =========================================================
-      # 13. INSTALL IMAGEMAGICK
+      # 14. INSTALL IMAGEMAGICK
       # =========================================================
       - name: Install ImageMagick
         shell: bash
@@ -481,109 +520,156 @@ jobs:
           set -e
 
           sudo apt-get update
-          sudo apt-get install -y imagemagick
+
+          sudo apt-get install \
+            -y imagemagick
 
           convert --version
 
 
       # =========================================================
-      # 14. GENERATE CEK VAR ICON
-      #
-      # Kalau script project tersedia, gunakan script asli.
+      # 15. GENERATE LAUNCHER ICON
       # =========================================================
       - name: Generate CEK VAR launcher icon
         shell: bash
         run: |
           set -e
 
-          if [ -f scripts/generate-icons.sh ]; then
+          RES="android/app/src/main/res"
 
-            chmod +x scripts/generate-icons.sh
-            bash scripts/generate-icons.sh
+          mkdir -p \
+            "$RES/mipmap-mdpi" \
+            "$RES/mipmap-hdpi" \
+            "$RES/mipmap-xhdpi" \
+            "$RES/mipmap-xxhdpi" \
+            "$RES/mipmap-xxxhdpi"
 
-          else
 
-            echo "generate-icons.sh tidak ada."
-            echo "Membuat icon langsung dari assets/icon.png."
+          # -----------------------------------------------------
+          # Generate legacy bitmap icons
+          # -----------------------------------------------------
 
-            RES="android/app/src/main/res"
+          convert \
+            assets/icon.png \
+            -resize 48x48 \
+            "$RES/mipmap-mdpi/ic_launcher.png"
 
-            mkdir -p "$RES/mipmap-mdpi"
-            mkdir -p "$RES/mipmap-hdpi"
-            mkdir -p "$RES/mipmap-xhdpi"
-            mkdir -p "$RES/mipmap-xxhdpi"
-            mkdir -p "$RES/mipmap-xxxhdpi"
+          convert \
+            assets/icon.png \
+            -resize 72x72 \
+            "$RES/mipmap-hdpi/ic_launcher.png"
 
-            convert assets/icon.png -resize 48x48 \
-              "$RES/mipmap-mdpi/ic_launcher.png"
+          convert \
+            assets/icon.png \
+            -resize 96x96 \
+            "$RES/mipmap-xhdpi/ic_launcher.png"
 
-            convert assets/icon.png -resize 72x72 \
-              "$RES/mipmap-hdpi/ic_launcher.png"
+          convert \
+            assets/icon.png \
+            -resize 144x144 \
+            "$RES/mipmap-xxhdpi/ic_launcher.png"
 
-            convert assets/icon.png -resize 96x96 \
-              "$RES/mipmap-xhdpi/ic_launcher.png"
+          convert \
+            assets/icon.png \
+            -resize 192x192 \
+            "$RES/mipmap-xxxhdpi/ic_launcher.png"
 
-            convert assets/icon.png -resize 144x144 \
-              "$RES/mipmap-xxhdpi/ic_launcher.png"
 
-            convert assets/icon.png -resize 192x192 \
-              "$RES/mipmap-xxxhdpi/ic_launcher.png"
+          # -----------------------------------------------------
+          # Round versions
+          # -----------------------------------------------------
 
-            for D in mdpi hdpi xhdpi xxhdpi xxxhdpi
-            do
-              cp \
-                "$RES/mipmap-$D/ic_launcher.png" \
-                "$RES/mipmap-$D/ic_launcher_round.png"
-            done
+          for D in \
+            mdpi \
+            hdpi \
+            xhdpi \
+            xxhdpi \
+            xxxhdpi
+          do
 
-          fi
+            cp \
+              "$RES/mipmap-$D/ic_launcher.png" \
+              "$RES/mipmap-$D/ic_launcher_round.png"
 
-          echo "Launcher icon selesai."
+          done
+
+
+          echo ""
+          echo "Launcher bitmap icons generated."
 
 
       # =========================================================
-      # 15. FORCE CEK VAR ICON IN MANIFEST
+      # 16. REMOVE GENERATED ADAPTIVE ICON CONFLICT
+      #
+      # Adaptive icons are valid Android resources.
+      # We remove them here only so the generated CEK VAR
+      # bitmap icon is definitely the icon used by this build.
+      # =========================================================
+      - name: Normalize launcher icon resources
+        shell: bash
+        run: |
+          set -e
+
+          RES="android/app/src/main/res"
+
+          rm -f \
+            "$RES/mipmap-anydpi-v26/ic_launcher.xml" \
+            "$RES/mipmap-anydpi-v26/ic_launcher_round.xml"
+
+          rm -f \
+            "$RES/mipmap-anydpi-v33/ic_launcher.xml" \
+            "$RES/mipmap-anydpi-v33/ic_launcher_round.xml"
+
+          rm -f \
+            "$RES/mipmap-anydpi-v35/ic_launcher.xml" \
+            "$RES/mipmap-anydpi-v35/ic_launcher_round.xml"
+
+          echo "Adaptive launcher XML normalized."
+
+
+      # =========================================================
+      # 17. FORCE APP ICON
       # =========================================================
       - name: Force CEK VAR app icon
         shell: bash
         run: |
           set -e
 
-          python3 - <<'PY'
+          python3 <<'PY'
           from pathlib import Path
           import re
 
-          p = Path(
+          manifest = Path(
               "android/app/src/main/AndroidManifest.xml"
           )
 
-          s = p.read_text()
+          text = manifest.read_text()
 
-          start = s.find("<application")
+          start = text.find("<application")
 
           if start < 0:
               raise SystemExit(
                   "application tag tidak ditemukan"
               )
 
-          end = s.find(">", start)
+          end = text.find(">", start)
 
           if end < 0:
               raise SystemExit(
-                  "application tag rusak"
+                  "application tag tidak valid"
               )
 
-          tag = s[start:end]
+          tag = text[start:end]
 
           tag = re.sub(
               r'\s+android:icon="[^"]*"',
-              '',
+              "",
               tag
           )
 
           tag = re.sub(
               r'\s+android:roundIcon="[^"]*"',
-              '',
+              "",
               tag
           )
 
@@ -592,48 +678,55 @@ jobs:
               ' android:roundIcon="@mipmap/ic_launcher_round"'
           )
 
-          s = s[:start] + tag + s[end:]
+          text = (
+              text[:start]
+              + tag
+              + text[end:]
+          )
 
-          p.write_text(s)
+          manifest.write_text(text)
+
+          print(
+              "Manifest launcher icon configured."
+          )
           PY
-
-          grep -n \
-            'android:icon\|android:roundIcon' \
-            android/app/src/main/AndroidManifest.xml
 
 
       # =========================================================
-      # 16. VERIFY CEK VAR ICON
+      # 18. VERIFY LAUNCHER ICON
       # =========================================================
       - name: Verify CEK VAR launcher icon
         shell: bash
         run: |
           set -e
 
-          for D in mdpi hdpi xhdpi xxhdpi xxxhdpi
-          do
-            test -f \
-              "android/app/src/main/res/mipmap-$D/ic_launcher.png"
+          RES="android/app/src/main/res"
 
-            test -f \
-              "android/app/src/main/res/mipmap-$D/ic_launcher_round.png"
+          for D in \
+            mdpi \
+            hdpi \
+            xhdpi \
+            xxhdpi \
+            xxxhdpi
+          do
+
+            test -s \
+              "$RES/mipmap-$D/ic_launcher.png"
+
+            test -s \
+              "$RES/mipmap-$D/ic_launcher_round.png"
+
           done
 
-          if find android/app/src/main/res \
-            -type f \
-            \( -name 'ic_launcher.xml' \
-            -o -name 'ic_launcher_round.xml' \) \
-            | grep -q .
-          then
-            echo "ERROR: adaptive launcher icon ditemukan."
-            exit 1
-          fi
+          grep -q \
+            'android:icon="@mipmap/ic_launcher"' \
+            android/app/src/main/AndroidManifest.xml
 
-          echo "CEK VAR launcher icon OK."
+          echo "Launcher icon verification OK."
 
 
       # =========================================================
-      # 17. PREPARE NOTIFICATION SOUND
+      # 19. NOTIFICATION SOUND
       # =========================================================
       - name: Prepare notification sound
         shell: bash
@@ -645,14 +738,15 @@ jobs:
 
           if [ -f assets/notif.wav ]; then
 
-            cp assets/notif.wav \
+            cp \
+              assets/notif.wav \
               android/app/src/main/res/raw/notif.wav
 
           else
 
-            echo "Membuat fallback notification sound..."
+            echo "Creating fallback notification sound..."
 
-            python3 - <<'PY'
+            python3 <<'PY'
           import wave
           import math
           import struct
@@ -661,53 +755,67 @@ jobs:
               "android/app/src/main/res/raw/notif.wav"
           )
 
-          rate = 44100
+          sample_rate = 44100
           duration = 0.45
           volume = 0.35
 
           frames = []
 
           for i in range(
-              int(rate * duration)
+              int(sample_rate * duration)
           ):
-              t = i / rate
+
+              t = i / sample_rate
 
               if t < 0.22:
-                  freq = 880
+                  frequency = 880
               else:
-                  freq = 1175
+                  frequency = 1175
 
               sample = int(
                   32767
                   * volume
                   * math.sin(
-                      2 * math.pi * freq * t
+                      2
+                      * math.pi
+                      * frequency
+                      * t
                   )
               )
 
               frames.append(
-                  struct.pack("<h", sample)
+                  struct.pack(
+                      "<h",
+                      sample
+                  )
               )
 
-          with wave.open(filename, "wb") as wav:
+          with wave.open(
+              filename,
+              "wb"
+          ) as wav:
+
               wav.setnchannels(1)
               wav.setsampwidth(2)
-              wav.setframerate(rate)
+              wav.setframerate(sample_rate)
+
               wav.writeframes(
                   b"".join(frames)
               )
 
-          print("Fallback sound OK.")
+          print(
+              "Fallback notification sound created."
+          )
           PY
 
           fi
 
-          test -f \
+          test -s \
             android/app/src/main/res/raw/notif.wav
 
 
       # =========================================================
-      # 18. PREPARE FCM ICON
+      # 20. FCM ICON
       # =========================================================
       - name: Prepare FCM notification icon
         shell: bash
@@ -723,15 +831,16 @@ jobs:
             SOURCE="assets/icon.png"
           fi
 
-          cp "$SOURCE" \
+          cp \
+            "$SOURCE" \
             android/app/src/main/res/drawable/push_icon.png
 
-          test -f \
+          test -s \
             android/app/src/main/res/drawable/push_icon.png
 
 
       # =========================================================
-      # 19. CONFIGURE FCM RESOURCES
+      # 21. FCM RESOURCES
       # =========================================================
       - name: Configure FCM Android resources
         shell: bash
@@ -750,38 +859,39 @@ jobs:
           </resources>
           XML
 
-          python3 - <<'PY'
+
+          python3 <<'PY'
           from pathlib import Path
 
-          p = Path(
+          manifest = Path(
               "android/app/src/main/AndroidManifest.xml"
           )
 
-          s = p.read_text()
+          text = manifest.read_text()
 
-          permission = (
+
+          notification_permission = (
               '<uses-permission '
               'android:name="android.permission.POST_NOTIFICATIONS" />'
           )
 
-          if permission not in s:
+          if notification_permission not in text:
 
-              m = s.find("<manifest")
+              pos = text.find("<manifest")
 
-              if m < 0:
-                  raise SystemExit(
-                      "manifest tag tidak ditemukan"
-                  )
-
-              end = s.find(">", m)
-
-              s = (
-                  s[:end + 1]
-                  + "\n    "
-                  + permission
-                  + "\n"
-                  + s[end + 1:]
+              end = text.find(
+                  ">",
+                  pos
               )
+
+              text = (
+                  text[:end + 1]
+                  + "\n    "
+                  + notification_permission
+                  + "\n"
+                  + text[end + 1:]
+              )
+
 
           icon_meta = (
               '<meta-data '
@@ -795,33 +905,49 @@ jobs:
               'android:resource="@string/default_notification_channel_id" />'
           )
 
-          if "com.google.firebase.messaging.default_notification_icon" not in s:
 
-              pos = s.find("<application")
+          application_pos = text.find(
+              "<application"
+          )
 
-              if pos < 0:
-                  raise SystemExit(
-                      "application tag tidak ditemukan"
-                  )
+          application_end = text.find(
+              ">",
+              application_pos
+          )
 
-              end = s.find(">", pos)
 
-              s = (
-                  s[:end + 1]
+          application_block = text[
+              application_pos:
+              application_end
+          ]
+
+
+          if (
+              "default_notification_icon"
+              not in application_block
+          ):
+
+              text = (
+                  text[:application_end + 1]
                   + "\n        "
                   + icon_meta
                   + "\n        "
                   + channel_meta
                   + "\n"
-                  + s[end + 1:]
+                  + text[application_end + 1:]
               )
 
-          p.write_text(s)
+
+          manifest.write_text(text)
+
+          print(
+              "FCM resources configured."
+          )
           PY
 
 
       # =========================================================
-      # 20B. CREATE SECURE APK UPDATER PLUGIN
+      # 22. SECURE APK UPDATER
       # =========================================================
       - name: Configure secure APK updater
         shell: bash
@@ -829,8 +955,11 @@ jobs:
           set -e
 
           MAIN_DIR="android/app/src/main/java/com/parkiranmobiltamu/app"
+
           MAIN="$MAIN_DIR/AppUpdater.java"
+
           mkdir -p "$MAIN_DIR"
+
 
           cat > "$MAIN" <<'JAVA'
           package com.parkiranmobiltamu.app;
@@ -841,208 +970,816 @@ jobs:
           import android.net.Uri;
           import android.os.Build;
           import android.provider.Settings;
-          import android.content.Context;
+
           import androidx.core.content.FileProvider;
+
           import com.getcapacitor.Plugin;
           import com.getcapacitor.PluginCall;
           import com.getcapacitor.annotation.CapacitorPlugin;
           import com.getcapacitor.annotation.PluginMethod;
-          import java.io.*;
+
+          import java.io.File;
+          import java.io.FileInputStream;
+          import java.io.FileOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+
           import java.net.HttpURLConnection;
           import java.net.URL;
+
           import java.security.MessageDigest;
+
           import java.util.Locale;
           import java.util.concurrent.Executors;
 
+
           @CapacitorPlugin(name = "AppUpdater")
           public class AppUpdater extends Plugin {
+
               @PluginMethod
-              public void downloadAndInstall(PluginCall call) {
-                  final String urlText = call.getString("url", "");
-                  final String expectedSha256 = call.getString("sha256", "");
-                  final String expectedPackage = call.getString("packageName", "com.parkiranmobiltamu.app");
-                  final long expectedVersionCode = call.getLong("versionCode", 0L);
+              public void downloadAndInstall(
+                      PluginCall call
+              ) {
 
-                  if (!urlText.startsWith("https://")) { call.reject("Update hanya boleh melalui HTTPS."); return; }
+                  final String urlText =
+                          call.getString(
+                                  "url",
+                                  ""
+                          );
+
+                  final String expectedSha256 =
+                          call.getString(
+                                  "sha256",
+                                  ""
+                          );
+
+                  final String expectedPackage =
+                          call.getString(
+                                  "packageName",
+                                  "com.parkiranmobiltamu.app"
+                          );
+
+                  final long expectedVersionCode =
+                          call.getLong(
+                                  "versionCode",
+                                  0L
+                          );
+
+
+                  if (!urlText.startsWith("https://")) {
+
+                      call.reject(
+                              "Update hanya boleh menggunakan HTTPS."
+                      );
+
+                      return;
+                  }
+
+
                   try {
-                      String host = new URL(urlText).getHost().toLowerCase(Locale.US);
-                      if (!host.equals("github.com") && !host.equals("www.github.com")) { call.reject("Sumber APK tidak diizinkan."); return; }
-                  } catch (Exception e) { call.reject("URL update tidak valid."); return; }
-                  if (!expectedPackage.equals(getContext().getPackageName())) { call.reject("Package APK tidak cocok."); return; }
 
-                  Executors.newSingleThreadExecutor().execute(() -> {
-                      File apk = null;
-                      try {
-                          if (Build.VERSION.SDK_INT >= 26 && !getContext().getPackageManager().canRequestPackageInstalls()) {
-                              Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
-                              settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                              getContext().startActivity(settings);
-                              call.reject("IZIN_INSTALL_REQUIRED", "Izinkan pemasangan aplikasi dari sumber ini, lalu tekan UPDATE APK lagi.");
-                              return;
-                          }
+                      String host =
+                              new URL(urlText)
+                                      .getHost()
+                                      .toLowerCase(Locale.US);
 
-                          apk = downloadApk(urlText);
-                          if (!expectedSha256.isEmpty() && !sha256(apk).equalsIgnoreCase(expectedSha256)) {
-                              apk.delete(); call.reject("HASH_MISMATCH", "SHA-256 APK tidak cocok. Update dibatalkan."); return;
-                          }
+                      if (
+                              !host.equals("github.com")
+                              &&
+                              !host.equals("www.github.com")
+                      ) {
 
-                          PackageManager pm = getContext().getPackageManager();
-                          PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_META_DATA);
-                          if (info == null || !expectedPackage.equals(info.packageName)) {
-                              apk.delete(); call.reject("PACKAGE_MISMATCH", "Package APK tidak cocok. Update dibatalkan."); return;
-                          }
-                          long downloadedVersion = Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
-                          if (expectedVersionCode > 0 && downloadedVersion != expectedVersionCode) {
-                              apk.delete(); call.reject("VERSION_MISMATCH", "VersionCode APK tidak cocok dengan manifest update."); return;
-                          }
+                          call.reject(
+                                  "Sumber APK tidak diizinkan."
+                          );
 
-                          File installFile = new File(getContext().getCacheDir(), "parkir-update.apk");
-                          if (installFile.exists()) installFile.delete();
-                          if (!apk.renameTo(installFile)) { copyFile(apk, installFile); apk.delete(); }
-
-                          Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", installFile);
-                          Intent intent = new Intent(Intent.ACTION_VIEW);
-                          intent.setDataAndType(uri, "application/vnd.android.package-archive");
-                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                          getContext().startActivity(intent);
-                          call.resolve();
-                      } catch (Exception e) {
-                          if (apk != null && apk.exists()) apk.delete();
-                          call.reject("UPDATE_FAILED", e.getMessage() == null ? "Download/update gagal." : e.getMessage());
+                          return;
                       }
-                  });
+
+                  } catch (Exception e) {
+
+                      call.reject(
+                              "URL update tidak valid."
+                      );
+
+                      return;
+                  }
+
+
+                  if (
+                          !expectedPackage.equals(
+                                  getContext()
+                                          .getPackageName()
+                          )
+                  ) {
+
+                      call.reject(
+                              "Package APK tidak cocok."
+                      );
+
+                      return;
+                  }
+
+
+                  Executors
+                          .newSingleThreadExecutor()
+                          .execute(
+                                  () -> {
+
+                                      File apk = null;
+
+                                      try {
+
+                                          if (
+                                                  Build.VERSION.SDK_INT >= 26
+                                                  &&
+                                                  !getContext()
+                                                          .getPackageManager()
+                                                          .canRequestPackageInstalls()
+                                          ) {
+
+                                              Intent settings =
+                                                      new Intent(
+                                                              Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                                              Uri.parse(
+                                                                      "package:"
+                                                                      + getContext()
+                                                                      .getPackageName()
+                                                              )
+                                                      );
+
+                                              settings.addFlags(
+                                                      Intent.FLAG_ACTIVITY_NEW_TASK
+                                              );
+
+                                              getContext()
+                                                      .startActivity(settings);
+
+                                              call.reject(
+                                                      "IZIN_INSTALL_REQUIRED",
+                                                      "Izinkan pemasangan aplikasi dari sumber ini, lalu tekan UPDATE APK lagi."
+                                              );
+
+                                              return;
+                                          }
+
+
+                                          apk =
+                                                  downloadApk(
+                                                          urlText
+                                                  );
+
+
+                                          if (
+                                                  !expectedSha256.isEmpty()
+                                                  &&
+                                                  !sha256(apk)
+                                                          .equalsIgnoreCase(
+                                                                  expectedSha256
+                                                          )
+                                          ) {
+
+                                              apk.delete();
+
+                                              call.reject(
+                                                      "HASH_MISMATCH",
+                                                      "SHA-256 APK tidak cocok. Update dibatalkan."
+                                              );
+
+                                              return;
+                                          }
+
+
+                                          PackageManager pm =
+                                                  getContext()
+                                                          .getPackageManager();
+
+
+                                          PackageInfo info =
+                                                  pm.getPackageArchiveInfo(
+                                                          apk.getAbsolutePath(),
+                                                          PackageManager.GET_META_DATA
+                                                  );
+
+
+                                          if (
+                                                  info == null
+                                                  ||
+                                                  !expectedPackage.equals(
+                                                          info.packageName
+                                                  )
+                                          ) {
+
+                                              apk.delete();
+
+                                              call.reject(
+                                                      "PACKAGE_MISMATCH",
+                                                      "Package APK tidak cocok."
+                                              );
+
+                                              return;
+                                          }
+
+
+                                          long downloadedVersion;
+
+                                          if (
+                                                  Build.VERSION.SDK_INT >= 28
+                                          ) {
+
+                                              downloadedVersion =
+                                                      info.getLongVersionCode();
+
+                                          } else {
+
+                                              downloadedVersion =
+                                                      info.versionCode;
+                                          }
+
+
+                                          if (
+                                                  expectedVersionCode > 0
+                                                  &&
+                                                  downloadedVersion
+                                                          != expectedVersionCode
+                                          ) {
+
+                                              apk.delete();
+
+                                              call.reject(
+                                                      "VERSION_MISMATCH",
+                                                      "VersionCode APK tidak cocok."
+                                              );
+
+                                              return;
+                                          }
+
+
+                                          File installFile =
+                                                  new File(
+                                                          getContext()
+                                                                  .getCacheDir(),
+                                                          "parkir-update.apk"
+                                                  );
+
+
+                                          if (
+                                                  installFile.exists()
+                                          ) {
+
+                                              installFile.delete();
+                                          }
+
+
+                                          if (
+                                                  !apk.renameTo(
+                                                          installFile
+                                                  )
+                                          ) {
+
+                                              copyFile(
+                                                      apk,
+                                                      installFile
+                                              );
+
+                                              apk.delete();
+                                          }
+
+
+                                          Uri uri =
+                                                  FileProvider
+                                                          .getUriForFile(
+                                                                  getContext(),
+                                                                  getContext()
+                                                                          .getPackageName()
+                                                                          + ".fileprovider",
+                                                                  installFile
+                                                          );
+
+
+                                          Intent intent =
+                                                  new Intent(
+                                                          Intent.ACTION_VIEW
+                                                  );
+
+
+                                          intent.setDataAndType(
+                                                  uri,
+                                                  "application/vnd.android.package-archive"
+                                          );
+
+
+                                          intent.addFlags(
+                                                  Intent.FLAG_ACTIVITY_NEW_TASK
+                                                          |
+                                                  Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                          );
+
+
+                                          getContext()
+                                                  .startActivity(intent);
+
+
+                                          call.resolve();
+
+                                      } catch (Exception e) {
+
+                                          if (
+                                                  apk != null
+                                                  &&
+                                                  apk.exists()
+                                          ) {
+
+                                              apk.delete();
+                                          }
+
+
+                                          call.reject(
+                                                  "UPDATE_FAILED",
+                                                  e.getMessage() == null
+                                                          ?
+                                                  "Download/update gagal."
+                                                          :
+                                                  e.getMessage()
+                                          );
+                                      }
+                                  }
+                          );
               }
 
-              private File downloadApk(String urlText) throws Exception {
-                  File dir = new File(getContext().getCacheDir(), "updates");
-                  if (!dir.exists() && !dir.mkdirs()) throw new Exception("Folder update tidak dapat dibuat.");
-                  File out = new File(dir, "parkir-update-download.apk");
-                  HttpURLConnection c = (HttpURLConnection)new URL(urlText).openConnection();
-                  c.setInstanceFollowRedirects(true); c.setConnectTimeout(15000); c.setReadTimeout(30000);
-                  c.connect();
-                  if (c.getResponseCode() < 200 || c.getResponseCode() >= 300) throw new Exception("Server update HTTP " + c.getResponseCode());
-                  long len = c.getContentLengthLong(); if (len > 60L*1024L*1024L) throw new Exception("Ukuran APK terlalu besar.");
-                  try (InputStream in=c.getInputStream(); FileOutputStream outStream=new FileOutputStream(out)) {
-                      byte[] b=new byte[8192]; int n; long total=0;
-                      while((n=in.read(b))!=-1){ total+=n; if(total>60L*1024L*1024L) throw new Exception("Ukuran APK melebihi batas keamanan."); outStream.write(b,0,n); }
-                  } finally { c.disconnect(); }
+
+              private File downloadApk(
+                      String urlText
+              ) throws Exception {
+
+                  File dir =
+                          new File(
+                                  getContext()
+                                          .getCacheDir(),
+                                  "updates"
+                          );
+
+
+                  if (
+                          !dir.exists()
+                          &&
+                          !dir.mkdirs()
+                  ) {
+
+                      throw new Exception(
+                              "Folder update tidak dapat dibuat."
+                      );
+                  }
+
+
+                  File out =
+                          new File(
+                                  dir,
+                                  "parkir-update-download.apk"
+                          );
+
+
+                  HttpURLConnection connection =
+                          (HttpURLConnection)
+                                  new URL(
+                                          urlText
+                                  ).openConnection();
+
+
+                  connection.setInstanceFollowRedirects(
+                          true
+                  );
+
+                  connection.setConnectTimeout(
+                          15000
+                  );
+
+                  connection.setReadTimeout(
+                          30000
+                  );
+
+                  connection.connect();
+
+
+                  int response =
+                          connection.getResponseCode();
+
+
+                  if (
+                          response < 200
+                          ||
+                          response >= 300
+                  ) {
+
+                      throw new Exception(
+                              "Server update HTTP "
+                                      + response
+                      );
+                  }
+
+
+                  long maxSize =
+                          60L
+                          *
+                          1024L
+                          *
+                          1024L;
+
+
+                  try (
+                          InputStream in =
+                                  connection.getInputStream();
+
+                          FileOutputStream output =
+                                  new FileOutputStream(out)
+                  ) {
+
+                      byte[] buffer =
+                              new byte[8192];
+
+                      int count;
+
+                      long total = 0;
+
+
+                      while (
+                              (count =
+                                      in.read(buffer))
+                                      != -1
+                      ) {
+
+                          total += count;
+
+
+                          if (
+                                  total > maxSize
+                          ) {
+
+                              throw new Exception(
+                                      "Ukuran APK terlalu besar."
+                              );
+                          }
+
+
+                          output.write(
+                                  buffer,
+                                  0,
+                                  count
+                          );
+                      }
+
+                  } finally {
+
+                      connection.disconnect();
+                  }
+
+
                   return out;
               }
 
-              private String sha256(File f) throws Exception {
-                  MessageDigest d=MessageDigest.getInstance("SHA-256");
-                  try(InputStream in=new FileInputStream(f)){ byte[] b=new byte[8192]; int n; while((n=in.read(b))!=-1)d.update(b,0,n); }
-                  StringBuilder s=new StringBuilder(); for(byte x:d.digest()) s.append(String.format(Locale.US,"%02x",x)); return s.toString();
+
+              private String sha256(
+                      File file
+              ) throws Exception {
+
+                  MessageDigest digest =
+                          MessageDigest.getInstance(
+                                  "SHA-256"
+                          );
+
+
+                  try (
+                          InputStream input =
+                                  new FileInputStream(
+                                          file
+                                  )
+                  ) {
+
+                      byte[] buffer =
+                              new byte[8192];
+
+                      int count;
+
+
+                      while (
+                              (count =
+                                      input.read(buffer))
+                                      != -1
+                      ) {
+
+                          digest.update(
+                                  buffer,
+                                  0,
+                                  count
+                          );
+                      }
+                  }
+
+
+                  StringBuilder result =
+                          new StringBuilder();
+
+
+                  for (
+                          byte b :
+                          digest.digest()
+                  ) {
+
+                      result.append(
+                              String.format(
+                                      Locale.US,
+                                      "%02x",
+                                      b
+                              )
+                      );
+                  }
+
+
+                  return result.toString();
               }
 
-              private void copyFile(File a, File b) throws Exception {
-                  try(InputStream in=new FileInputStream(a); OutputStream out=new FileOutputStream(b)){ byte[] x=new byte[8192]; int n; while((n=in.read(x))!=-1)out.write(x,0,n); }
+
+              private void copyFile(
+                      File source,
+                      File destination
+              ) throws Exception {
+
+                  try (
+                          InputStream input =
+                                  new FileInputStream(
+                                          source
+                                  );
+
+                          OutputStream output =
+                                  new FileOutputStream(
+                                          destination
+                                  )
+                  ) {
+
+                      byte[] buffer =
+                              new byte[8192];
+
+                      int count;
+
+
+                      while (
+                              (count =
+                                      input.read(buffer))
+                                      != -1
+                      ) {
+
+                          output.write(
+                                  buffer,
+                                  0,
+                                  count
+                          );
+                      }
+                  }
               }
           }
           JAVA
 
-          test -f "$MAIN"
 
-          python3 - <<'PY2'
+          test -s "$MAIN"
+
+
+          # -----------------------------------------------------
+          # INSTALL PERMISSION
+          # -----------------------------------------------------
+
+          python3 <<'PY'
           from pathlib import Path
-          p=Path("android/app/src/main/AndroidManifest.xml")
-          s=p.read_text()
-          permission='<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
-          if permission not in s:
-              pos=s.find("<manifest"); end=s.find(">",pos); s=s[:end+1]+"\\n    "+permission+"\\n"+s[end+1:]
-          provider='        <provider\n              android:name=\"androidx.core.content.FileProvider\"\n              android:authorities=\"${applicationId}.fileprovider\"\n              android:exported=\"false\"\n              android:grantUriPermissions=\"true\">\n              <meta-data\n                  android:name=\"android.support.FILE_PROVIDER_PATHS\"\n                  android:resource=\"@xml/file_paths\" />\n          </provider>'
-          if "${applicationId}.fileprovider" not in s:
-              pos=s.find("</application>"); s=s[:pos]+provider+"\\n"+s[pos:]
-          p.write_text(s)
-          PY2
 
-          mkdir -p android/app/src/main/res/xml
-          cat > android/app/src/main/res/xml/file_paths.xml <<'XML'
+          manifest = Path(
+              "android/app/src/main/AndroidManifest.xml"
+          )
+
+          text = manifest.read_text()
+
+
+          permission = (
+              '<uses-permission '
+              'android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          )
+
+
+          if permission not in text:
+
+              pos = text.find("<manifest")
+
+              end = text.find(
+                  ">",
+                  pos
+              )
+
+              text = (
+                  text[:end + 1]
+                  + "\n    "
+                  + permission
+                  + "\n"
+                  + text[end + 1:]
+              )
+
+
+          provider = """
+              <provider
+                  android:name="androidx.core.content.FileProvider"
+                  android:authorities="${applicationId}.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+
+                  <meta-data
+                      android:name="android.support.FILE_PROVIDER_PATHS"
+                      android:resource="@xml/file_paths" />
+
+              </provider>
+          """
+
+
+          if (
+              "${applicationId}.fileprovider"
+              not in text
+          ):
+
+              pos = text.find(
+                  "</application>"
+              )
+
+              text = (
+                  text[:pos]
+                  + provider
+                  + "\n"
+                  + text[pos:]
+              )
+
+
+          manifest.write_text(text)
+          PY
+
+
+          mkdir -p \
+            android/app/src/main/res/xml
+
+
+          cat > \
+            android/app/src/main/res/xml/file_paths.xml \
+            <<'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
-              <cache-path name="update_cache" path="updates/" />
-              <cache-path name="root_cache" path="." />
+
+              <cache-path
+                  name="update_cache"
+                  path="updates/" />
+
+              <cache-path
+                  name="root_cache"
+                  path="." />
+
           </paths>
           XML
 
 
+          echo "Secure APK updater configured."
+
+
       # =========================================================
-      # 21. CAPACITOR SYNC
+      # 23. CAPACITOR SYNC
       # =========================================================
-      - name: Sync Capacitor plugins and web assets
+      - name: Sync Capacitor
         shell: bash
         run: |
           set -e
 
           npx cap sync android
 
-
-      # =========================================================
-      # 22. VERIFY FINAL WEB ASSETS
-      # =========================================================
-      - name: Verify final web assets
-        shell: bash
-        run: |
-          set -e
-
-          test -f www/index.html
-          test -f www/native-bridge.js
-
-          echo "Final web assets OK."
+          echo ""
+          echo "Capacitor sync OK."
 
 
       # =========================================================
-      # 23. VERIFY GRADLE WRAPPER
+      # 24. VERIFY GRADLE CONFIG
       # =========================================================
-      - name: Verify Gradle wrapper
+      - name: Verify Gradle configuration
         shell: bash
         run: |
           set -e
 
           test -f android/gradlew
-          test -f android/gradle/wrapper/gradle-wrapper.jar
-          test -f android/gradle/wrapper/gradle-wrapper.properties
+
+          test -f \
+            android/gradle/wrapper/gradle-wrapper.jar
+
+          test -f \
+            android/gradle/wrapper/gradle-wrapper.properties
 
           chmod +x android/gradlew
 
+          echo ""
           echo "Gradle wrapper OK."
 
+          echo ""
+          echo "Gradle distribution:"
+          grep "distributionUrl" \
+            android/gradle/wrapper/gradle-wrapper.properties || true
+
 
       # =========================================================
-      # 24. BUILD DEBUG APK
+      # 25. SET VERSION
+      # versionCode 2
+      # versionName 1.1.0
       # =========================================================
-      - name: Build debug APK
-        working-directory: android
+      - name: Set app version
         shell: bash
         run: |
           set -e
 
-          chmod +x gradlew
-
-      # =========================================================
-      # FORCE UPDATE APP VERSION — v1.1.0 / versionCode 2
-      # =========================================================
-      - name: Set app version for update system
-        shell: bash
-        run: |
-          set -e
-          python3 - <<'PY2'
+          python3 <<'PY'
           from pathlib import Path
           import re
-          p = Path("android/app/build.gradle")
-          s = p.read_text()
-          if re.search(r"versionCode\s+\d+", s):
-              s = re.sub(r"versionCode\s+\d+", "versionCode 2", s, count=1)
-          else:
-              s = s.replace("defaultConfig {", "defaultConfig {\n        versionCode 2", 1)
-          if re.search(r"versionName\s+['\"][^'\"]+['\"]", s):
-              s = re.sub(r"versionName\s+['\"][^'\"]+['\"]", 'versionName "1.1.0"', s, count=1)
-          else:
-              s = s.replace("defaultConfig {", 'defaultConfig {\n        versionName "1.1.0"', 1)
-          p.write_text(s)
-          PY2
-          grep -n "versionCode\|versionName" android/app/build.gradle | head -10
 
+          path = Path(
+              "android/app/build.gradle"
+          )
+
+          text = path.read_text()
+
+
+          # versionCode
+
+          if re.search(
+              r"versionCode\s+\d+",
+              text
+          ):
+
+              text = re.sub(
+                  r"versionCode\s+\d+",
+                  "versionCode 2",
+                  text,
+                  count=1
+              )
+
+          else:
+
+              text = text.replace(
+                  "defaultConfig {",
+                  "defaultConfig {\n"
+                  "        versionCode 2",
+                  1
+              )
+
+
+          # versionName
+
+          if re.search(
+              r'versionName\s+[\'"][^\'"]+[\'"]',
+              text
+          ):
+
+              text = re.sub(
+                  r'versionName\s+[\'"][^\'"]+[\'"]',
+                  'versionName "1.1.0"',
+                  text,
+                  count=1
+              )
+
+          else:
+
+              text = text.replace(
+                  "defaultConfig {",
+                  'defaultConfig {\n'
+                  '        versionName "1.1.0"',
+                  1
+              )
+
+
+          path.write_text(text)
+
+          print(
+              "versionCode = 2"
+          )
+
+          print(
+              "versionName = 1.1.0"
+          )
+          PY
+
+
+          grep -n \
+            "versionCode\|versionName" \
+            android/app/build.gradle
+
+
+      # =========================================================
+      # 26. BUILD DEBUG APK
+      # =========================================================
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -e
+
+          cd android
+
+          chmod +x gradlew
 
           ./gradlew assembleDebug \
             --no-daemon \
@@ -1050,26 +1787,102 @@ jobs:
 
 
       # =========================================================
-      # 25. FIND APK
+      # 27. VERIFY APK
       # =========================================================
-      - name: Find APK
+      - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          find \
-            android/app/build/outputs/apk \
+          APK=$(find \
+            android/app/build/outputs/apk/debug \
             -type f \
             -name "*.apk" \
-            -print
+            | head -n 1)
+
+
+          if [ -z "$APK" ]; then
+
+            echo "ERROR: APK tidak ditemukan."
+
+            exit 1
+
+          fi
+
+
+          echo "APK:"
+          echo "$APK"
+
+          ls -lh "$APK"
+
+
+          echo ""
+          echo "SHA-256:"
+
+          sha256sum "$APK"
+
+
+          echo ""
+          echo "APK verification OK."
 
 
       # =========================================================
-      # 26. UPLOAD APK
+      # 28. COPY APK TO SIMPLE PATH
       # =========================================================
-      - name: Upload APK
+      - name: Prepare APK artifact
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p dist
+
+          APK=$(find \
+            android/app/build/outputs/apk/debug \
+            -type f \
+            -name "*.apk" \
+            | head -n 1)
+
+
+          cp \
+            "$APK" \
+            dist/parkir-mobil-tamu-v1.1.0-debug.apk
+
+
+          sha256sum \
+            dist/parkir-mobil-tamu-v1.1.0-debug.apk \
+            > dist/parkir-mobil-tamu-v1.1.0-debug.apk.sha256
+
+
+          echo ""
+          echo "Prepared files:"
+
+          ls -lh dist/
+
+
+      # =========================================================
+      # 29. UPLOAD APK
+      # =========================================================
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v2.5-fcm-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: parkir-mobil-tamu-v1.1.0-debug-apk
+          path: |
+            dist/parkir-mobil-tamu-v1.1.0-debug.apk
+            dist/parkir-mobil-tamu-v1.1.0-debug.apk.sha256
           if-no-files-found: error
+
+
+      # =========================================================
+      # 30. BUILD SUCCESS
+      # =========================================================
+      - name: Build success
+        shell: bash
+        run: |
+          echo ""
+          echo "========================================"
+          echo "BUILD BERHASIL"
+          echo "========================================"
+          echo "App: PARKIR MOBIL TAMU"
+          echo "Version: 1.1.0"
+          echo "VersionCode: 2"
+          echo "========================================"
