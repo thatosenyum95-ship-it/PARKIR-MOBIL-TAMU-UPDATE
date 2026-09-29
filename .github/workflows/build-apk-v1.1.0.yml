@@ -331,7 +331,7 @@ jobs:
 
           @CapacitorPlugin(name = "AppUpdater")
           public class AppUpdater extends Plugin {
-              @PluginMethod
+              @PluginMethod()
               public void downloadAndInstall(PluginCall call) {
                   String urlText = call.getString("url", "");
                   String expectedSha256 = call.getString("sha256", "");
@@ -541,6 +541,17 @@ jobs:
 
           test -s "$MAIN_DIR/AppUpdater.java"
           test -s android/app/src/main/res/xml/file_paths.xml
+
+      - name: Verify AppUpdater source
+        shell: bash
+        run: |
+          set -e
+          FILE="android/app/src/main/java/com/parkiranmobiltamu/app/AppUpdater.java"
+          test -f "$FILE"
+          ! grep -q "com.getcapacitor.annotation.PluginMethod" "$FILE"
+          grep -q "import com.getcapacitor.PluginMethod;" "$FILE"
+          grep -q "@PluginMethod()" "$FILE"
+          echo "AppUpdater source OK."
 
       - name: Set app version
         shell: bash
