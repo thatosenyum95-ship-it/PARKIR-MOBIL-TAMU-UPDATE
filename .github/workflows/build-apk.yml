@@ -69,7 +69,8 @@ jobs:
           mkdir -p android/app/src/main/res/raw
           cp assets/notif.wav android/app/src/main/res/raw/notif.wav
           mkdir -p android/app/src/main/res/drawable
-          if [ -f assets/push_icon.png ]; then cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png; fi
+          cp assets/icon.png android/app/src/main/res/drawable/cek_var_icon.png
+          cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png
 
       - name: Configure Google Services plugin
         shell: bash
@@ -111,6 +112,9 @@ jobs:
           meta='    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/push_icon" />\n'
           if "com.google.firebase.messaging.default_notification_icon" not in s:
               s=s.replace(marker,meta+marker,1)
+          # Use the CEK VAR image as the Android launcher icon.
+          s=s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/cek_var_icon"')
+          s=s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/cek_var_icon"')
           p.write_text(s)
           PY
 
