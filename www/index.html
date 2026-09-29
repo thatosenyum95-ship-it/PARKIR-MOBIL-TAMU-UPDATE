@@ -741,6 +741,21 @@ function autoSystem(){
 
 setInterval(render,1000); //
 /* LOGIN */
+function escapeHtml(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  }[ch]));
+}
+
+function safeUrl(value){
+  try{
+    const u = new URL(String(value || ""), window.location.href);
+    return ["https:","data:","blob:"].includes(u.protocol) ? u.href : "";
+  }catch{
+    return "";
+  }
+}
+
 function applyAdminSession(){
   const adminPanel = document.getElementById("adminForm");
   const announcementForm = document.getElementById("formPengumuman");
@@ -1105,7 +1120,7 @@ onSnapshot(refPengumuman, (snap) => {
 
         <b>📢 Pengumuman</b>
         <div style="margin-top:5px;">
-          ${p.isi}
+          ${escapeHtml(p.isi)}
         </div>
 
         <div id="balasan-${id}" style="margin-top:10px;"></div>
@@ -1144,7 +1159,7 @@ onSnapshot(refPengumuman, (snap) => {
             padding:5px;
             border-radius:6px;
           ">
-            <b>${data.pengirim}</b>: ${data.isi}
+            <b>${escapeHtml(data.pengirim)}</b>: ${escapeHtml(data.isi)}
           </div>
         `;
       });
