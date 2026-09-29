@@ -71,8 +71,19 @@ jobs:
       - name: Configure Android resources
         shell: bash
         run: |
+          set -e
           mkdir -p android/app/src/main/res/raw
           cp assets/notif.wav android/app/src/main/res/raw/notif.wav
+
+          # CEK VAR launcher icon: replace Capacitor's generated launcher PNGs
+          # in every density so Android/Samsung file managers cannot fall back
+          # to the default Android robot icon.
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "android/app/src/main/res/mipmap-${d}"
+            cp assets/icon.png "android/app/src/main/res/mipmap-${d}/ic_launcher.png"
+            cp assets/icon.png "android/app/src/main/res/mipmap-${d}/ic_launcher_round.png"
+          done
+
           mkdir -p android/app/src/main/res/drawable
           cp assets/icon.png android/app/src/main/res/drawable/cek_var_icon.png
           cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png
@@ -117,10 +128,11 @@ jobs:
           meta='    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/push_icon" />\n'
           if "com.google.firebase.messaging.default_notification_icon" not in s:
               s=s.replace(marker,meta+marker,1)
-          # Force the launcher icon to the CEK VAR asset, regardless of Capacitor defaults.
+          # Force the application manifest to use the standard mipmap launcher
+          # resources that were overwritten above.
           import re
-          s=re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/cek_var_icon"', s, count=1)
-          s=re.sub(r'android:roundIcon="[^"]+"', 'android:roundIcon="@drawable/cek_var_icon"', s, count=1)
+          s=re.sub(r'android:icon="[^"]+"', 'android:icon="@mipmap/ic_launcher"', s, count=1)
+          s=re.sub(r'android:roundIcon="[^"]+"', 'android:roundIcon="@mipmap/ic_launcher_round"', s, count=1)
           p.write_text(s)
           PY
 
