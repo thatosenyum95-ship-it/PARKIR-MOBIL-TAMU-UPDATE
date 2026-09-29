@@ -1,7 +1,12 @@
 {
   "appName": "PARKIR MOBIL TAMU",
-  "latestVersionCode": 1,
-  "latestVersionName": "1.0.0",
-  "minimumVersionCode": 1,
-  "mandatory": false,
-  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.0.0/app-debug.apk",
+  "packageName": "com.parkiranmobiltamu.app",
+  "latestVersionCode": 2,
+  "latestVersionName": "1.1.0",
+  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/latest/download/parkir-mobil-tamu.apk",
+  "changelog": [
+    "Perbaikan keamanan admin.",
+    "Perbaikan notifikasi pengumuman.",
+    "Menjaga fitur kamera, ANA, parkir, dan update aplikasi."
+  ]
+}

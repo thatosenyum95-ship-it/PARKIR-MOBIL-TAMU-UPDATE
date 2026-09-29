@@ -409,8 +409,8 @@ margin-top:5px;
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } 
-from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCz3MGaM79Mu7Gyao3M1RBLT9Lnmya026o",
@@ -424,6 +424,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
@@ -675,8 +676,8 @@ onSnapshot(visitorRef,(snap)=>{
   }
 });
 
-const ADMIN_SESSION_KEY = "parkir_admin_session";
-let isAdmin = localStorage.getItem(ADMIN_SESSION_KEY) === "1";
+let isAdmin = false;
+let adminAuthReady = false;
 let allData=[];
 let searchValue="";
 let mode="semua";
@@ -726,7 +727,7 @@ function applyAdminSession(){
   const visitorBox = document.getElementById("visitorBox");
   const loginBtn = document.getElementById("loginBtn");
 
-  isAdmin = localStorage.getItem(ADMIN_SESSION_KEY) === "1";
+  if(!adminAuthReady) isAdmin = false;
 
   if(isAdmin){
     if(adminPanel) adminPanel.style.display="block";
@@ -741,34 +742,54 @@ function applyAdminSession(){
   }
 }
 
-window.loginAdmin=function(){
-  if(localStorage.getItem(ADMIN_SESSION_KEY) === "1"){
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    isAdmin=false;
-    closeEditData();
-    applyAdminSession();
-    render();
+window.loginAdmin=async function(){
+  if(auth.currentUser){
+    await signOut(auth);
     alert("Admin logout ✅");
     return;
   }
 
-  const pass=prompt("Masukkan password admin:");
+  const email=prompt("Email admin Firebase:");
+  if(!email) return;
+  const pass=prompt("Password admin:");
+  if(pass===null) return;
 
-  if(pass==="291995"){
-    localStorage.setItem(ADMIN_SESSION_KEY,"1");
+  try{
+    const cred=await signInWithEmailAndPassword(auth,email.trim(),pass);
+    const adminSnap=await getDoc(doc(db,"admins",cred.user.uid));
+    if(!adminSnap.exists() || adminSnap.data()?.role !== "admin"){
+      await signOut(auth);
+      alert("Akun ini bukan admin ❌");
+      return;
+    }
     isAdmin=true;
     applyAdminSession();
-    alert("Login berhasil sebagai ADMIN ✅");
     render();
-  } else if(pass!==null){
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    isAdmin=false;
-    applyAdminSession();
-    alert("Password salah ❌");
+    alert("Login berhasil sebagai ADMIN ✅");
+  }catch(err){
+    console.error("Login admin gagal:",err);
+    alert("Login admin gagal. Periksa email/password atau akun admin Firebase. ❌");
   }
 };
 
 applyAdminSession();
+
+onAuthStateChanged(auth, async (user)=>{
+  adminAuthReady = true;
+  isAdmin = false;
+  if(user){
+    try{
+      const adminSnap = await getDoc(doc(db,"admins",user.uid));
+      isAdmin = adminSnap.exists() && adminSnap.data()?.role === "admin";
+      if(!isAdmin) await signOut(auth);
+    }catch(err){
+      console.error("Pemeriksaan role admin gagal:",err);
+      isAdmin = false;
+    }
+  }
+  applyAdminSession();
+  render();
+});
 window.kirimPengumuman = async function () {
 
   if (!isAdmin){
