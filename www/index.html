@@ -537,7 +537,7 @@ async function createParkirNotificationChannel(){
     name: "Pengumuman Parkir",
     description: "Notifikasi pengumuman parkir",
     importance: 5,
-    sound: "notif.wav",
+    sound: "notif",
     visibility: 1,
     vibration: true
   };
@@ -578,7 +578,7 @@ async function showSystemNotification(title, body, channelId=FCM_CHANNEL_ID){
         body: body || "Ada pengumuman baru.",
         channelId,
         smallIcon: "push_icon",
-        sound: "notif.wav",
+        sound: "notif",
         schedule: { at: new Date(Date.now() + 300) }
       }]
     });
