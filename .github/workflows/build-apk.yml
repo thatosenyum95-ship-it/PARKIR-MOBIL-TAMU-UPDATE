@@ -22,7 +22,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Prepare notification sound
         shell: bash
@@ -43,6 +43,14 @@ jobs:
               w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(b"".join(frames))
           PY
 
+      - name: Verify exact CEK VAR icon is present
+        shell: bash
+        run: |
+          set -e
+          test -f assets/icon.png
+          test -f assets/push_icon.png
+          echo "CEK VAR icon assets ditemukan."
+
       - name: Generate Android platform
         run: npx cap add android
 
@@ -62,6 +70,49 @@ jobs:
           cp assets/notif.wav android/app/src/main/res/raw/notif.wav
           mkdir -p android/app/src/main/res/drawable
           if [ -f assets/push_icon.png ]; then cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png; fi
+
+      - name: Configure Google Services plugin
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/build.gradle")
+          s=p.read_text()
+          if "com.google.gms:google-services:4.4.4" not in s:
+              marker="dependencies {"
+              i=s.find(marker)
+              if i < 0: raise SystemExit("dependencies block tidak ditemukan")
+              end=s.find("}", i)
+              s=s[:end] + "\n        classpath 'com.google.gms:google-services:4.4.4'" + s[end:]
+              p.write_text(s)
+          p=Path("android/app/build.gradle")
+          s=p.read_text()
+          if "com.google.gms.google-services" not in s:
+              s += "\napply plugin: 'com.google.gms.google-services'\n"
+              p.write_text(s)
+          PY
+
+      - name: Configure FCM default resources
+        shell: bash
+        run: |
+          set -e
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/firebase_messaging.xml <<'EOF'
+          <resources>
+            <string name="default_notification_channel_id">pengumuman_fcm_v3</string>
+          </resources>
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          marker="</application>"
+          meta='    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/push_icon" />\n'
+          if "com.google.firebase.messaging.default_notification_icon" not in s:
+              s=s.replace(marker,meta+marker,1)
+          p.write_text(s)
+          PY
 
       - name: Build debug APK
         working-directory: android
