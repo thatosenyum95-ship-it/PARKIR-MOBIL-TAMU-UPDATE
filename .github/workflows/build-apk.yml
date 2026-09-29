@@ -117,9 +117,10 @@ jobs:
           meta='    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/push_icon" />\n'
           if "com.google.firebase.messaging.default_notification_icon" not in s:
               s=s.replace(marker,meta+marker,1)
-          # Use the CEK VAR image as the Android launcher icon.
-          s=s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/cek_var_icon"')
-          s=s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/cek_var_icon"')
+          # Force the launcher icon to the CEK VAR asset, regardless of Capacitor defaults.
+          import re
+          s=re.sub(r'android:icon="[^"]+"', 'android:icon="@drawable/cek_var_icon"', s, count=1)
+          s=re.sub(r'android:roundIcon="[^"]+"', 'android:roundIcon="@drawable/cek_var_icon"', s, count=1)
           p.write_text(s)
           PY
 
