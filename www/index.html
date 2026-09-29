@@ -953,12 +953,33 @@ window.addData = async function(){
 
   let valid = true;
 
+  if(!isAdmin){
+    alert("Login dulu sebagai admin ❌");
+    return;
+  }
+
+  const namaEl=document.getElementById("nama");
+  const kamarEl=document.getElementById("kamar");
+  const platEl=document.getElementById("plat");
+  const plat2El=document.getElementById("plat2");
+  const posisi1El=document.getElementById("posisi1");
+  const posisi2El=document.getElementById("posisi2");
+  const foto1El=document.getElementById("foto1");
+  const foto2El=document.getElementById("foto2");
+  const foto1LinkEl=document.getElementById("foto1Link");
+  const foto2LinkEl=document.getElementById("foto2Link");
+  const errNamaEl=document.getElementById("errNama");
+  const errKamarEl=document.getElementById("errKamar");
+  const errPlatEl=document.getElementById("errPlat");
+  const errPosisi1El=document.getElementById("errPosisi1");
+  const errFotoEl=document.getElementById("errFoto");
+
   const fields = [
-    {el:nama, err:errNama, msg:"Nama wajib diisi"},
-    {el:kamar, err:errKamar, msg:"Kamar wajib diisi"},
-    {el:plat, err:errPlat, msg:"Plat wajib diisi"},
-    {el:posisi1, err:errPosisi1, msg:"Posisi 1 wajib diisi"},
-    {el:foto1, err:errFoto, msg:"Foto mobil 1 wajib diisi"}
+    {el:namaEl, err:errNamaEl, msg:"Nama wajib diisi"},
+    {el:kamarEl, err:errKamarEl, msg:"Kamar wajib diisi"},
+    {el:platEl, err:errPlatEl, msg:"Plat wajib diisi"},
+    {el:posisi1El, err:errPosisi1El, msg:"Posisi 1 wajib diisi"},
+    {el:foto1El, err:errFotoEl, msg:"Foto mobil 1 wajib diisi"}
   ];
 
   fields.forEach(f=>{
