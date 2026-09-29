@@ -1,0 +1,74 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, repair-security-fcm-2026-09]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare notification sound
+        shell: bash
+        run: |
+          mkdir -p assets
+          python3 - <<'PY'
+          import math, wave, struct
+          path="assets/notif.wav"
+          rate=44100
+          duration=0.32
+          frames=[]
+          for i in range(int(rate*duration)):
+              t=i/rate
+              f=880 if t < 0.16 else 1174
+              amp=0.28 * (1 - t/duration)
+              frames.append(struct.pack("<h", int(32767*amp*math.sin(2*math.pi*f*t))))
+          with wave.open(path,"w") as w:
+              w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(b"".join(frames))
+          PY
+
+      - name: Generate Android platform
+        run: npx cap add android
+
+      - name: Copy Firebase config
+        run: cp google-services.json android/app/google-services.json
+
+      - name: Build web/native bridge
+        run: npm run build:native
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Configure Android resources
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          cp assets/notif.wav android/app/src/main/res/raw/notif.wav
+          mkdir -p android/app/src/main/res/drawable
+          if [ -f assets/push_icon.png ]; then cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png; fi
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: parkir-mobil-tamu-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
