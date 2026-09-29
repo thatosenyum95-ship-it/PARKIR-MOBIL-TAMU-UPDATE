@@ -678,8 +678,26 @@ onSnapshot(visitorRef,(snap)=>{
   }
 });
 
-const ADMIN_SESSION_KEY = "parkir_admin_session";
-let isAdmin = localStorage.getItem(ADMIN_SESSION_KEY) === "1";
+let isAdmin = false;
+let authReady = false;
+let adminCheckInFlight = null;
+
+async function refreshAdminRole(user){
+  if(!user) return false;
+  if(adminCheckInFlight) return adminCheckInFlight;
+  adminCheckInFlight = (async()=>{
+    try{
+      const adminSnap = await getDoc(doc(db, "admins", user.uid));
+      return adminSnap.exists() && adminSnap.data()?.enabled === true;
+    }catch(err){
+      console.warn("Pemeriksaan role admin gagal:", err);
+      return false;
+    }finally{
+      adminCheckInFlight = null;
+    }
+  })();
+  return adminCheckInFlight;
+}
 let allData=[];
 let searchValue="";
 let mode="semua";
