@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main, "repair/**"]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
