@@ -1218,12 +1218,12 @@ function render(){
     <div style="margin-bottom:8px;">
   <b>Status :</b>
   <span class="${d.status==="Masuk"?"status-masuk":"status-keluar"}">
-    ${d.status}
+    ${escapeHtml(d.status)}
   </span>
 </div>
 
-      <div class="field nama">Nama : ${d.nama||"-"}</div>
-      <div class="field kamar">Kamar : ${d.kamar||"-"}</div>
+      <div class="field nama">Nama : ${escapeHtml(d.nama||"-")}</div>
+      <div class="field kamar">Kamar : ${escapeHtml(d.kamar||"-")}</div>
       
       
       ${
@@ -1238,9 +1238,9 @@ function render(){
       return `
         <div style="margin-top:10px;">
 
-          <div class="field posisi">Posisi ${i+1} : ${posisi}</div>
+          <div class="field posisi">Posisi ${i+1} : ${escapeHtml(posisi)}</div>
           <div class="field plat">
-           Nomor Plat ${i+1} : ${plat}
+           Nomor Plat ${i+1} : ${escapeHtml(plat)}
           </div>
 ${d.status==="Masuk"
   ? `<div class="countdown">⏳ ${getCountdown()}</div>`
