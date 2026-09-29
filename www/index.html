@@ -1269,24 +1269,9 @@ ${d.status==="Masuk"
 
 /* CHECKOUT */
 window.checkoutMobil = async function(id,index){
-
   const data = allData.find(d=>d.id===id);
   if(!data) return;
-
-  data.mobil[index].status = "Keluar";
-
-  await updateDoc(doc(db,"parkir",id),{
-    mobil: data.mobil
-  });
-const semuaKeluar = data.mobil.every(m=>m.status==="Keluar");
-
-if(semuaKeluar){
-  await updateDoc(doc(db,"parkir",id),{
-    status:"Keluar",
-    waktuKeluar:Date.now()
-  });
-}
-
+  await window.checkout(id);
 };
 window.checkout=id=>{
   if(confirm("Yakin keluar?")){
@@ -1537,8 +1522,8 @@ setInterval(()=>{
 let zoom = 1;
 
 window.goHome = function(){
-
-  window.location.href = window.location.href;
+  document.getElementById("editOverlay")?.style.setProperty("display","none");
+  window.scrollTo({top:0,behavior:"smooth"});
 };
 window.openImg = function(src){
   const viewer = document.getElementById("imgViewer");
