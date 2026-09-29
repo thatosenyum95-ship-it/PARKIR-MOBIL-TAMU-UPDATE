@@ -1,0 +1,9 @@
+node_modules/
+android/
+dist/
+*.jks
+*.keystore
+*.p12
+.env
+.env.*
+google-services.local.json
