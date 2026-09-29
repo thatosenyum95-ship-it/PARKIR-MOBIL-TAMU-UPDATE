@@ -998,8 +998,8 @@ window.addData = async function(){
   if(!valid) return;
 
   await addDoc(ref,{
-  nama:nama.value.toUpperCase(),
-  kamar:kamar.value,
+  nama:namaEl.value.toUpperCase(),
+  kamar:kamarEl.value,
 
   plat:[
     plat.value.toUpperCase(),
