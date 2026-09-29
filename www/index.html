@@ -747,8 +747,6 @@ function applyAdminSession(){
   const visitorBox = document.getElementById("visitorBox");
   const loginBtn = document.getElementById("loginBtn");
 
-  isAdmin = localStorage.getItem(ADMIN_SESSION_KEY) === "1";
-
   if(isAdmin){
     if(adminPanel) adminPanel.style.display="block";
     if(announcementForm) announcementForm.style.display="block";
@@ -760,34 +758,45 @@ function applyAdminSession(){
     if(visitorBox) visitorBox.style.display="none";
     if(loginBtn){ loginBtn.textContent="🔐 LOGIN ADMIN"; loginBtn.style.background="#8e44ad"; }
   }
+  render();
 }
 
-window.loginAdmin=function(){
-  if(localStorage.getItem(ADMIN_SESSION_KEY) === "1"){
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    isAdmin=false;
-    closeEditData();
-    applyAdminSession();
-    render();
-    alert("Admin logout ✅");
+window.loginAdmin=async function(){
+  if(!authReady){
+    alert("Menyiapkan keamanan login. Coba lagi sebentar.");
     return;
   }
 
-  const pass=prompt("Masukkan password admin:");
+  const user = auth.currentUser;
+  if(user){
+    await signOut(auth);
+    return;
+  }
 
-  if(pass==="291995"){
-    localStorage.setItem(ADMIN_SESSION_KEY,"1");
-    isAdmin=true;
-    applyAdminSession();
+  const email=prompt("Email admin Firebase:");
+  if(email===null) return;
+  const pass=prompt("Password admin Firebase:");
+  if(pass===null) return;
+
+  try{
+    await signInWithEmailAndPassword(auth, email.trim(), pass);
+    if(!isAdmin){
+      await signOut(auth);
+      alert("Akun berhasil login, tetapi belum terdaftar sebagai admin.");
+      return;
+    }
     alert("Login berhasil sebagai ADMIN ✅");
-    render();
-  } else if(pass!==null){
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    isAdmin=false;
-    applyAdminSession();
-    alert("Password salah ❌");
+  }catch(err){
+    console.error("Login admin gagal:", err);
+    alert("Login gagal. Periksa email/password atau status admin Firebase.");
   }
 };
+
+onAuthStateChanged(auth, async (user)=>{
+  isAdmin = await refreshAdminRole(user);
+  authReady = true;
+  applyAdminSession();
+});
 
 applyAdminSession();
 window.kirimPengumuman = async function () {
