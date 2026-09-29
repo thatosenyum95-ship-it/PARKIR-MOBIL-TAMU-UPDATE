@@ -426,6 +426,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
