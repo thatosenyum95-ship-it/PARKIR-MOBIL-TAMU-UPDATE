@@ -33,26 +33,19 @@ jobs:
         shell: bash
         run: |
           set -e
-
           test -f package.json
           test -f www/index.html
           test -f capacitor.config.ts
           test -f google-services.json
           test -f src/native-bridge.js
 
-          echo "Project structure OK."
-
       - name: Verify Firebase
         shell: bash
         run: |
           set -e
-
           node <<'NODE'
           const fs = require("fs");
-
-          const data = JSON.parse(
-            fs.readFileSync("google-services.json", "utf8")
-          );
+          const data = JSON.parse(fs.readFileSync("google-services.json", "utf8"));
 
           if (data.project_info?.project_id !== "parkir-mobil") {
             throw new Error("Firebase project harus parkir-mobil");
@@ -65,9 +58,7 @@ jobs:
           );
 
           if (!found) {
-            throw new Error(
-              "Package com.parkiranmobiltamu.app tidak ditemukan"
-            );
+            throw new Error("Package com.parkiranmobiltamu.app tidak ditemukan");
           }
 
           console.log("Firebase config OK.");
@@ -77,11 +68,7 @@ jobs:
         shell: bash
         run: |
           set -e
-
-          npm install \
-            --no-audit \
-            --no-fund
-
+          npm install --no-audit --no-fund
           npx cap --version
           npx esbuild --version
           npx tsc --version
@@ -90,303 +77,101 @@ jobs:
         shell: bash
         run: |
           set -e
-
           mkdir -p www
-
-          npx esbuild \
-            src/native-bridge.js \
+          npx esbuild src/native-bridge.js \
             --bundle \
             --format=iife \
             --platform=browser \
             --outfile=www/native-bridge.js
-
           test -s www/native-bridge.js
 
       - name: Verify web assets
         shell: bash
         run: |
           set -e
-
           test -s www/index.html
           test -s www/native-bridge.js
-
           grep -q "native-bridge.js" www/index.html
 
       - name: Create Android platform
         shell: bash
         run: |
           set -e
-
           if [ ! -d android ]; then
             npx cap add android
           fi
-
           test -f android/gradlew
+          chmod +x android/gradlew
 
       - name: Install Firebase Android config
         shell: bash
         run: |
           set -e
-
-          mkdir -p android/app
-
-          cp \
-            google-services.json \
-            android/app/google-services.json
-
+          cp google-services.json android/app/google-services.json
           test -f android/app/google-services.json
 
       - name: Verify Android Gradle setup
         shell: bash
         run: |
           set -e
-
           test -f android/build.gradle
           test -f android/app/build.gradle
           test -f android/gradle/wrapper/gradle-wrapper.jar
           test -f android/gradle/wrapper/gradle-wrapper.properties
 
+      # Capacitor sync MUST happen before custom native Android edits.
+      - name: Sync Capacitor
+        shell: bash
+        run: |
+          set -e
+          npx cap sync android
           chmod +x android/gradlew
-
-          echo "Gradle setup OK."
-
-      - name: Prepare assets
-        shell: bash
-        run: |
-          set -e
-
-          mkdir -p assets
-
-          if [ -f icon.png ]; then
-            cp icon.png assets/icon.png
-          elif [ -f www/icon.png ]; then
-            cp www/icon.png assets/icon.png
-          fi
-
-          if [ ! -f assets/icon.png ]; then
-            python3 <<'PY'
-          import struct
-          import zlib
-
-          width = 192
-          height = 192
-
-          rows = []
-
-          for y in range(height):
-              row = bytearray([0])
-
-              for x in range(width):
-                  dx = x - width / 2
-                  dy = y - height / 2
-                  radius = (dx * dx + dy * dy) ** 0.5
-
-                  if radius < 78:
-                      pixel = (235, 235, 235, 255)
-                  else:
-                      pixel = (18, 18, 18, 255)
-
-                  row.extend(pixel)
-
-              rows.append(bytes(row))
-
-          def chunk(kind, data):
-              return (
-                  struct.pack(">I", len(data))
-                  + kind
-                  + data
-                  + struct.pack(
-                      ">I",
-                      zlib.crc32(kind + data) & 0xffffffff
-                  )
-              )
-
-          raw = b"".join(rows)
-
-          png = b"\x89PNG\r\n\x1a\n"
-
-          png += chunk(
-              b"IHDR",
-              struct.pack(
-                  ">IIBBBBB",
-                  width,
-                  height,
-                  8,
-                  6,
-                  0,
-                  0,
-                  0
-              )
-          )
-
-          png += chunk(
-              b"IDAT",
-              zlib.compress(raw, 9)
-          )
-
-          png += chunk(b"IEND", b"")
-
-          with open("assets/icon.png", "wb") as f:
-              f.write(png)
-          PY
-          fi
-
-          cp assets/icon.png assets/push_icon.png
-
-      - name: Install ImageMagick
-        shell: bash
-        run: |
-          set -e
-
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
-
-      - name: Generate launcher icons
-        shell: bash
-        run: |
-          set -e
-
-          RES="android/app/src/main/res"
-
-          mkdir -p \
-            "$RES/mipmap-mdpi" \
-            "$RES/mipmap-hdpi" \
-            "$RES/mipmap-xhdpi" \
-            "$RES/mipmap-xxhdpi" \
-            "$RES/mipmap-xxxhdpi"
-
-          convert assets/icon.png -resize 48x48 \
-            "$RES/mipmap-mdpi/ic_launcher.png"
-
-          convert assets/icon.png -resize 72x72 \
-            "$RES/mipmap-hdpi/ic_launcher.png"
-
-          convert assets/icon.png -resize 96x96 \
-            "$RES/mipmap-xhdpi/ic_launcher.png"
-
-          convert assets/icon.png -resize 144x144 \
-            "$RES/mipmap-xxhdpi/ic_launcher.png"
-
-          convert assets/icon.png -resize 192x192 \
-            "$RES/mipmap-xxxhdpi/ic_launcher.png"
-
-          for D in mdpi hdpi xhdpi xxhdpi xxxhdpi
-          do
-            cp \
-              "$RES/mipmap-$D/ic_launcher.png" \
-              "$RES/mipmap-$D/ic_launcher_round.png"
-          done
-
-      - name: Normalize launcher resources
-        shell: bash
-        run: |
-          set -e
-
-          RES="android/app/src/main/res"
-
-          rm -f \
-            "$RES/mipmap-anydpi-v26/ic_launcher.xml" \
-            "$RES/mipmap-anydpi-v26/ic_launcher_round.xml" \
-            "$RES/mipmap-anydpi-v33/ic_launcher.xml" \
-            "$RES/mipmap-anydpi-v33/ic_launcher_round.xml" \
-            "$RES/mipmap-anydpi-v35/ic_launcher.xml" \
-            "$RES/mipmap-anydpi-v35/ic_launcher_round.xml" \
-            2>/dev/null || true
-
-      - name: Configure launcher icon
-        shell: bash
-        run: |
-          set -e
-
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          manifest = Path(
-              "android/app/src/main/AndroidManifest.xml"
-          )
-
-          text = manifest.read_text()
-
-          start = text.find("<application")
-
-          if start < 0:
-              raise SystemExit("application tag tidak ditemukan")
-
-          end = text.find(">", start)
-
-          tag = text[start:end]
-
-          tag = re.sub(
-              r'\s+android:icon="[^"]*"',
-              "",
-              tag
-          )
-
-          tag = re.sub(
-              r'\s+android:roundIcon="[^"]*"',
-              "",
-              tag
-          )
-
-          tag += (
-              ' android:icon="@mipmap/ic_launcher"'
-              ' android:roundIcon="@mipmap/ic_launcher_round"'
-          )
-
-          manifest.write_text(
-              text[:start] + tag + text[end:]
-          )
-          PY
 
       - name: Prepare notification resources
         shell: bash
         run: |
           set -e
+          mkdir -p android/app/src/main/res/raw
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/values
 
-          mkdir -p \
-            android/app/src/main/res/raw \
-            android/app/src/main/res/drawable \
-            android/app/src/main/res/values
+          if [ -f android/app/src/main/res/mipmap-mdpi/ic_launcher.png ]; then
+            cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png \
+              android/app/src/main/res/drawable/push_icon.png
+          fi
 
-          cp \
-            assets/push_icon.png \
-            android/app/src/main/res/drawable/push_icon.png
-
-          if [ -f assets/notif.wav ]; then
-            cp \
-              assets/notif.wav \
-              android/app/src/main/res/raw/notif.wav
-          else
+          if [ ! -f android/app/src/main/res/drawable/push_icon.png ]; then
             python3 <<'PY'
-          import wave
-          import math
+          from pathlib import Path
           import struct
+          import zlib
 
-          filename = (
-              "android/app/src/main/res/raw/notif.wav"
-          )
+          width = height = 192
+          rows = []
 
-          rate = 44100
-          duration = 0.45
-          frames = []
+          for y in range(height):
+              row = bytearray([0])
+              for x in range(width):
+                  dx = x - width / 2
+                  dy = y - height / 2
+                  inside = (dx * dx + dy * dy) ** 0.5 < 78
+                  pixel = (235, 235, 235, 255) if inside else (18, 18, 18, 255)
+                  row.extend(pixel)
+              rows.append(bytes(row))
 
-          for i in range(int(rate * duration)):
-              t = i / rate
-              freq = 880 if t < 0.22 else 1175
-
-              sample = int(
-                  32767 * 0.35 *
-                  math.sin(2 * math.pi * freq * t)
+          def chunk(kind, data):
+              return (
+                  struct.pack(">I", len(data)) + kind + data +
+                  struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
               )
 
-              frames.append(struct.pack("<h", sample))
+          raw = b"".join(rows)
+          png = b"\x89PNG\r\n\x1a\n"
+          png += chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+          png += chunk(b"IDAT", zlib.compress(raw, 9))
+          png += chunk(b"IEND", b"")
 
-          with wave.open(filename, "wb") as wav:
-              wav.setnchannels(1)
-              wav.setsampwidth(2)
-              wav.setframerate(rate)
-              wav.writeframes(b"".join(frames))
+          Path("android/app/src/main/res/drawable/push_icon.png").write_bytes(png)
           PY
           fi
 
@@ -397,63 +182,119 @@ jobs:
           </resources>
           XML
 
-      - name: Configure FCM manifest
+      - name: Configure Android manifest safely
         shell: bash
         run: |
           set -e
 
           python3 <<'PY'
           from pathlib import Path
+          import xml.etree.ElementTree as ET
 
-          manifest = Path(
-              "android/app/src/main/AndroidManifest.xml"
-          )
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          android_ns = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android_ns)
 
-          text = manifest.read_text()
+          tree = ET.parse(path)
+          root = tree.getroot()
 
-          permission = (
-              '<uses-permission '
-              'android:name="android.permission.POST_NOTIFICATIONS" />'
-          )
+          if root.tag != "manifest":
+              raise SystemExit("Root AndroidManifest bukan <manifest>")
 
-          if permission not in text:
-              pos = text.find(">")
-              text = (
-                  text[:pos + 1]
-                  + "\n    "
-                  + permission
-                  + "\n"
-                  + text[pos + 1:]
+          permissions = {
+              "android.permission.POST_NOTIFICATIONS",
+              "android.permission.REQUEST_INSTALL_PACKAGES",
+          }
+
+          existing_permissions = {
+              node.get(f"{{{android_ns}}}name")
+              for node in root.findall("uses-permission")
+          }
+
+          for permission in sorted(permissions - existing_permissions):
+              ET.SubElement(
+                  root,
+                  "uses-permission",
+                  {f"{{{android_ns}}}name": permission},
               )
 
-          icon_meta = (
-              '<meta-data '
-              'android:name="com.google.firebase.messaging.default_notification_icon" '
-              'android:resource="@drawable/push_icon" />'
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("<application> tidak ditemukan")
+
+          app.set(f"{{{android_ns}}}icon", "@mipmap/ic_launcher")
+          app.set(f"{{{android_ns}}}roundIcon", "@mipmap/ic_launcher_round")
+
+          metadata = {
+              node.get(f"{{{android_ns}}}name"): node
+              for node in app.findall("meta-data")
+          }
+
+          def ensure_metadata(name, resource):
+              node = metadata.get(name)
+              if node is None:
+                  node = ET.SubElement(app, "meta-data")
+              node.set(f"{{{android_ns}}}name", name)
+              node.set(f"{{{android_ns}}}resource", resource)
+
+          ensure_metadata(
+              "com.google.firebase.messaging.default_notification_icon",
+              "@drawable/push_icon",
+          )
+          ensure_metadata(
+              "com.google.firebase.messaging.default_notification_channel_id",
+              "@string/default_notification_channel_id",
           )
 
-          channel_meta = (
-              '<meta-data '
-              'android:name="com.google.firebase.messaging.default_notification_channel_id" '
-              'android:resource="@string/default_notification_channel_id" />'
+          authority = "${applicationId}.fileprovider"
+          providers = app.findall("provider")
+          provider = None
+
+          for node in providers:
+              if node.get(f"{{{android_ns}}}authorities") == authority:
+                  provider = node
+                  break
+
+          if provider is None:
+              provider = ET.SubElement(app, "provider")
+
+          provider.set(
+              f"{{{android_ns}}}name",
+              "androidx.core.content.FileProvider",
+          )
+          provider.set(
+              f"{{{android_ns}}}authorities",
+              authority,
+          )
+          provider.set(f"{{{android_ns}}}exported", "false")
+          provider.set(f"{{{android_ns}}}grantUriPermissions", "true")
+
+          provider_meta = None
+          for node in provider.findall("meta-data"):
+              if node.get(f"{{{android_ns}}}name") == "android.support.FILE_PROVIDER_PATHS":
+                  provider_meta = node
+                  break
+
+          if provider_meta is None:
+              provider_meta = ET.SubElement(provider, "meta-data")
+
+          provider_meta.set(
+              f"{{{android_ns}}}name",
+              "android.support.FILE_PROVIDER_PATHS",
+          )
+          provider_meta.set(
+              f"{{{android_ns}}}resource",
+              "@xml/file_paths",
           )
 
-          app_end = text.find(">", text.find("<application"))
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          print("AndroidManifest.xml valid and configured.")
+          PY
 
-          block = text[text.find("<application"):app_end]
-
-          if "default_notification_icon" not in block:
-              text = (
-                  text[:app_end + 1]
-                  + "\n        "
-                  + icon_meta
-                  + "\n        "
-                  + channel_meta
-                  + "\n"
-                  + text[app_end + 1:]
-              )
-
-          manifest.write_text(text)
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse("android/app/src/main/AndroidManifest.xml")
+          print("Manifest XML validation: OK")
           PY
 
       - name: Configure secure APK updater
@@ -462,7 +303,6 @@ jobs:
           set -e
 
           MAIN_DIR="android/app/src/main/java/com/parkiranmobiltamu/app"
-
           mkdir -p "$MAIN_DIR"
           mkdir -p android/app/src/main/res/xml
 
@@ -491,43 +331,25 @@ jobs:
 
           @CapacitorPlugin(name = "AppUpdater")
           public class AppUpdater extends Plugin {
-
               @PluginMethod
               public void downloadAndInstall(PluginCall call) {
-
-                  String urlText =
-                      call.getString("url", "");
-
-                  String expectedSha256 =
-                      call.getString("sha256", "");
-
-                  String expectedPackage =
-                      call.getString(
-                          "packageName",
-                          "com.parkiranmobiltamu.app"
-                      );
-
-                  long expectedVersionCode =
-                      call.getLong("versionCode", 0L);
+                  String urlText = call.getString("url", "");
+                  String expectedSha256 = call.getString("sha256", "");
+                  String expectedPackage = call.getString(
+                      "packageName",
+                      "com.parkiranmobiltamu.app"
+                  );
+                  long expectedVersionCode = call.getLong("versionCode", 0L);
 
                   if (!urlText.startsWith("https://")) {
-                      call.reject(
-                          "Update hanya boleh menggunakan HTTPS."
-                      );
+                      call.reject("Update hanya boleh menggunakan HTTPS.");
                       return;
                   }
 
                   try {
-                      String host =
-                          new URL(urlText)
-                              .getHost()
-                              .toLowerCase(Locale.US);
-
-                      if (!host.equals("github.com") &&
-                          !host.equals("www.github.com")) {
-                          call.reject(
-                              "Sumber APK tidak diizinkan."
-                          );
+                      String host = new URL(urlText).getHost().toLowerCase(Locale.US);
+                      if (!host.equals("github.com") && !host.equals("www.github.com")) {
+                          call.reject("Sumber APK tidak diizinkan.");
                           return;
                       }
                   } catch (Exception e) {
@@ -535,151 +357,93 @@ jobs:
                       return;
                   }
 
-                  if (!expectedPackage.equals(
-                      getContext().getPackageName()
-                  )) {
+                  if (!expectedPackage.equals(getContext().getPackageName())) {
                       call.reject("Package APK tidak cocok.");
                       return;
                   }
 
                   Executors.newSingleThreadExecutor().execute(() -> {
-
                       File apk = null;
-
                       try {
-
                           if (Build.VERSION.SDK_INT >= 26 &&
-                              !getContext()
-                                  .getPackageManager()
-                                  .canRequestPackageInstalls()) {
-
-                              Intent settings =
-                                  new Intent(
-                                      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                      Uri.parse(
-                                          "package:" +
-                                          getContext().getPackageName()
-                                      )
-                                  );
-
-                              settings.addFlags(
-                                  Intent.FLAG_ACTIVITY_NEW_TASK
+                              !getContext().getPackageManager().canRequestPackageInstalls()) {
+                              Intent settings = new Intent(
+                                  Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                  Uri.parse("package:" + getContext().getPackageName())
                               );
-
+                              settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                               getContext().startActivity(settings);
-
                               call.reject(
                                   "IZIN_INSTALL_REQUIRED",
                                   "Izinkan pemasangan aplikasi dari sumber ini, lalu tekan UPDATE APK lagi."
                               );
-
                               return;
                           }
 
                           apk = downloadApk(urlText);
 
                           if (!expectedSha256.isEmpty() &&
-                              !sha256(apk)
-                                  .equalsIgnoreCase(expectedSha256)) {
-
+                              !sha256(apk).equalsIgnoreCase(expectedSha256)) {
                               apk.delete();
-
-                              call.reject(
-                                  "HASH_MISMATCH",
-                                  "SHA-256 APK tidak cocok."
-                              );
-
+                              call.reject("HASH_MISMATCH", "SHA-256 APK tidak cocok.");
                               return;
                           }
 
-                          PackageManager pm =
-                              getContext().getPackageManager();
+                          PackageManager pm = getContext().getPackageManager();
+                          PackageInfo info = pm.getPackageArchiveInfo(
+                              apk.getAbsolutePath(),
+                              PackageManager.GET_META_DATA
+                          );
 
-                          PackageInfo info =
-                              pm.getPackageArchiveInfo(
-                                  apk.getAbsolutePath(),
-                                  PackageManager.GET_META_DATA
-                              );
-
-                          if (info == null ||
-                              !expectedPackage.equals(
-                                  info.packageName
-                              )) {
-
+                          if (info == null || !expectedPackage.equals(info.packageName)) {
                               apk.delete();
-
-                              call.reject(
-                                  "PACKAGE_MISMATCH",
-                                  "Package APK tidak cocok."
-                              );
-
+                              call.reject("PACKAGE_MISMATCH", "Package APK tidak cocok.");
                               return;
                           }
 
-                          long version =
-                              Build.VERSION.SDK_INT >= 28
-                                  ? info.getLongVersionCode()
-                                  : info.versionCode;
+                          long version = Build.VERSION.SDK_INT >= 28
+                              ? info.getLongVersionCode()
+                              : info.versionCode;
 
-                          if (expectedVersionCode > 0 &&
-                              version != expectedVersionCode) {
-
+                          if (expectedVersionCode > 0 && version != expectedVersionCode) {
                               apk.delete();
-
-                              call.reject(
-                                  "VERSION_MISMATCH",
-                                  "VersionCode APK tidak cocok."
-                              );
-
+                              call.reject("VERSION_MISMATCH", "VersionCode APK tidak cocok.");
                               return;
                           }
 
-                          File installFile =
-                              new File(
-                                  getContext().getCacheDir(),
-                                  "parkir-update.apk"
-                              );
+                          File installFile = new File(
+                              getContext().getCacheDir(),
+                              "parkir-update.apk"
+                          );
 
-                          if (installFile.exists()) {
-                              installFile.delete();
-                          }
+                          if (installFile.exists()) installFile.delete();
 
                           if (!apk.renameTo(installFile)) {
                               copyFile(apk, installFile);
                               apk.delete();
                           }
 
-                          Uri uri =
-                              FileProvider.getUriForFile(
-                                  getContext(),
-                                  getContext().getPackageName()
-                                      + ".fileprovider",
-                                  installFile
-                              );
+                          Uri uri = FileProvider.getUriForFile(
+                              getContext(),
+                              getContext().getPackageName() + ".fileprovider",
+                              installFile
+                          );
 
-                          Intent intent =
-                              new Intent(Intent.ACTION_VIEW);
-
+                          Intent intent = new Intent(Intent.ACTION_VIEW);
                           intent.setDataAndType(
                               uri,
                               "application/vnd.android.package-archive"
                           );
-
                           intent.addFlags(
                               Intent.FLAG_ACTIVITY_NEW_TASK |
                               Intent.FLAG_GRANT_READ_URI_PERMISSION
                           );
 
                           getContext().startActivity(intent);
-
                           call.resolve();
 
                       } catch (Exception e) {
-
-                          if (apk != null && apk.exists()) {
-                              apk.delete();
-                          }
-
+                          if (apk != null && apk.exists()) apk.delete();
                           call.reject(
                               "UPDATE_FAILED",
                               e.getMessage() == null
@@ -690,77 +454,43 @@ jobs:
                   });
               }
 
-              private File downloadApk(String urlText)
-                  throws Exception {
-
-                  File dir =
-                      new File(
-                          getContext().getCacheDir(),
-                          "updates"
-                      );
-
+              private File downloadApk(String urlText) throws Exception {
+                  File dir = new File(getContext().getCacheDir(), "updates");
                   if (!dir.exists() && !dir.mkdirs()) {
-                      throw new Exception(
-                          "Folder update tidak dapat dibuat."
-                      );
+                      throw new Exception("Folder update tidak dapat dibuat.");
                   }
 
-                  File out =
-                      new File(
-                          dir,
-                          "parkir-update-download.apk"
-                      );
-
+                  File out = new File(dir, "parkir-update-download.apk");
                   HttpURLConnection connection =
-                      (HttpURLConnection)
-                          new URL(urlText).openConnection();
+                      (HttpURLConnection) new URL(urlText).openConnection();
 
                   connection.setInstanceFollowRedirects(true);
                   connection.setConnectTimeout(15000);
                   connection.setReadTimeout(30000);
                   connection.connect();
 
-                  int response =
-                      connection.getResponseCode();
-
+                  int response = connection.getResponseCode();
                   if (response < 200 || response >= 300) {
-                      throw new Exception(
-                          "Server update HTTP " + response
-                      );
+                      throw new Exception("Server update HTTP " + response);
                   }
 
-                  long maxSize =
-                      60L * 1024L * 1024L;
+                  long maxSize = 60L * 1024L * 1024L;
 
                   try (
-                      InputStream in =
-                          connection.getInputStream();
-
-                      FileOutputStream output =
-                          new FileOutputStream(out)
+                      InputStream in = connection.getInputStream();
+                      FileOutputStream output = new FileOutputStream(out)
                   ) {
-
                       byte[] buffer = new byte[8192];
                       int count;
                       long total = 0;
 
                       while ((count = in.read(buffer)) != -1) {
-
                           total += count;
-
                           if (total > maxSize) {
-                              throw new Exception(
-                                  "Ukuran APK terlalu besar."
-                              );
+                              throw new Exception("Ukuran APK terlalu besar.");
                           }
-
-                          output.write(
-                              buffer,
-                              0,
-                              count
-                          );
+                          output.write(buffer, 0, count);
                       }
-
                   } finally {
                       connection.disconnect();
                   }
@@ -768,67 +498,33 @@ jobs:
                   return out;
               }
 
-              private String sha256(File file)
-                  throws Exception {
+              private String sha256(File file) throws Exception {
+                  MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
-                  MessageDigest digest =
-                      MessageDigest.getInstance("SHA-256");
-
-                  try (
-                      InputStream input =
-                          new FileInputStream(file)
-                  ) {
-
+                  try (InputStream input = new FileInputStream(file)) {
                       byte[] buffer = new byte[8192];
                       int count;
-
                       while ((count = input.read(buffer)) != -1) {
-                          digest.update(
-                              buffer,
-                              0,
-                              count
-                          );
+                          digest.update(buffer, 0, count);
                       }
                   }
 
-                  StringBuilder result =
-                      new StringBuilder();
-
+                  StringBuilder result = new StringBuilder();
                   for (byte b : digest.digest()) {
-                      result.append(
-                          String.format(
-                              Locale.US,
-                              "%02x",
-                              b
-                          )
-                      );
+                      result.append(String.format(Locale.US, "%02x", b));
                   }
-
                   return result.toString();
               }
 
-              private void copyFile(
-                  File source,
-                  File destination
-              ) throws Exception {
-
+              private void copyFile(File source, File destination) throws Exception {
                   try (
-                      InputStream input =
-                          new FileInputStream(source);
-
-                      OutputStream output =
-                          new FileOutputStream(destination)
+                      InputStream input = new FileInputStream(source);
+                      OutputStream output = new FileOutputStream(destination)
                   ) {
-
                       byte[] buffer = new byte[8192];
                       int count;
-
                       while ((count = input.read(buffer)) != -1) {
-                          output.write(
-                              buffer,
-                              0,
-                              count
-                          );
+                          output.write(buffer, 0, count);
                       }
                   }
               }
@@ -838,71 +534,13 @@ jobs:
           cat > android/app/src/main/res/xml/file_paths.xml <<'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
-              <cache-path
-                  name="update_cache"
-                  path="updates/" />
-              <cache-path
-                  name="root_cache"
-                  path="." />
+              <cache-path name="update_cache" path="updates/" />
+              <cache-path name="root_cache" path="." />
           </paths>
           XML
 
-          python3 <<'PY'
-          from pathlib import Path
-
-          manifest = Path(
-              "android/app/src/main/AndroidManifest.xml"
-          )
-
-          text = manifest.read_text()
-
-          permission = (
-              '<uses-permission '
-              'android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
-          )
-
-          if permission not in text:
-              pos = text.find(">")
-              text = (
-                  text[:pos + 1]
-                  + "\n    "
-                  + permission
-                  + "\n"
-                  + text[pos + 1:]
-              )
-
-          provider = """
-              <provider
-                  android:name="androidx.core.content.FileProvider"
-                  android:authorities="${applicationId}.fileprovider"
-                  android:exported="false"
-                  android:grantUriPermissions="true">
-                  <meta-data
-                      android:name="android.support.FILE_PROVIDER_PATHS"
-                      android:resource="@xml/file_paths" />
-              </provider>
-          """
-
-          if "${applicationId}.fileprovider" not in text:
-              pos = text.find("</application>")
-              text = (
-                  text[:pos]
-                  + provider
-                  + "\n"
-                  + text[pos:]
-              )
-
-          manifest.write_text(text)
-          PY
-
-      - name: Sync Capacitor
-        shell: bash
-        run: |
-          set -e
-
-          npx cap sync android
-
-          chmod +x android/gradlew
+          test -s "$MAIN_DIR/AppUpdater.java"
+          test -s android/app/src/main/res/xml/file_paths.xml
 
       - name: Set app version
         shell: bash
@@ -913,19 +551,10 @@ jobs:
           from pathlib import Path
           import re
 
-          path = Path(
-              "android/app/build.gradle"
-          )
-
+          path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(
-              r"versionCode\s+\d+",
-              "versionCode 2",
-              text,
-              count=1
-          )
-
+          text = re.sub(r"versionCode\s+\d+", "versionCode 2", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
               'versionName "1.1.0"',
@@ -936,38 +565,39 @@ jobs:
           path.write_text(text)
           PY
 
-          grep -n \
-            "versionCode\|versionName" \
-            android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+
+      - name: Final manifest validation
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse("android/app/src/main/AndroidManifest.xml")
+          print("Final AndroidManifest.xml validation: OK")
+          PY
+
+          test -f android/app/src/main/res/xml/file_paths.xml
+          test -f android/app/src/main/java/com/parkiranmobiltamu/app/AppUpdater.java
 
       - name: Build debug APK
         shell: bash
         run: |
           set -e
-
           cd android
-
-          ./gradlew assembleDebug \
-            --no-daemon \
-            --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK=$(find \
-            android/app/build/outputs/apk/debug \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
+          APK=$(find android/app/build/outputs/apk/debug \
+            -type f -name "*.apk" | head -n 1)
 
           test -n "$APK"
-
           echo "APK: $APK"
-
           ls -lh "$APK"
-
           sha256sum "$APK"
 
       - name: Prepare APK artifact
@@ -977,15 +607,10 @@ jobs:
 
           mkdir -p dist
 
-          APK=$(find \
-            android/app/build/outputs/apk/debug \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
+          APK=$(find android/app/build/outputs/apk/debug \
+            -type f -name "*.apk" | head -n 1)
 
-          cp \
-            "$APK" \
-            dist/parkir-mobil-tamu-v1.1.0-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.1.0-debug.apk
 
           sha256sum \
             dist/parkir-mobil-tamu-v1.1.0-debug.apk \
