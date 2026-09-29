@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "536896284217",
+    "firebase_url": "https://parkir-mobil-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "parkir-mobil",
+    "storage_bucket": "parkir-mobil.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536896284217:android:b4f242777d1f518d638fe8",
+        "android_client_info": {
+          "package_name": "com.parkiranmobiltamu.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlBnE9FebvtUM79VEHWYp424dVK4RficE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
