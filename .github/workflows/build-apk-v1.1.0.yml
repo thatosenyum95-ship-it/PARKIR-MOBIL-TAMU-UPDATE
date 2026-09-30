@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "update.json"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -637,6 +639,57 @@ jobs:
             dist/parkir-mobil-tamu-v1.1.0-debug.apk
             dist/parkir-mobil-tamu-v1.1.0-debug.apk.sha256
           if-no-files-found: error
+
+      - name: Publish GitHub Release and update manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -e
+
+          VERSION_NAME="1.1.0"
+          VERSION_CODE="2"
+          APK="dist/parkir-mobil-tamu-v1.1.0-debug.apk"
+          SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          TAG="v${VERSION_NAME}"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.1.0-debug.apk"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "$APK" --clobber
+          else
+            gh release create "${TAG}" "$APK" \
+              --title "PARKIR MOBIL TAMU ${VERSION_NAME}" \
+              --notes "PARKIR MOBIL TAMU VersionName ${VERSION_NAME}, VersionCode ${VERSION_CODE}."
+          fi
+
+          python3 <<PY
+          import json
+          from pathlib import Path
+
+          path = Path("update.json")
+          data = {
+              "appName": "PARKIR MOBIL TAMU",
+              "packageName": "com.parkiranmobiltamu.app",
+              "latestVersionCode": int("${VERSION_CODE}"),
+              "latestVersionName": "${VERSION_NAME}",
+              "minimumVersionCode": 1,
+              "mandatory": False,
+              "downloadUrl": "${RELEASE_URL}",
+              "sha256": "${SHA256}",
+              "changelog": [
+                  "Visitor sekarang dapat dilihat oleh admin.",
+                  "Visitor dapat dihapus satu per satu atau sekaligus.",
+                  "Penyelarasan VersionName 1.1.0 dan VersionCode 2."
+              ]
+          }
+          path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git diff --cached --quiet || git commit -m "Update release manifest to ${VERSION_NAME}"
+          git push
 
       - name: Build success
         shell: bash

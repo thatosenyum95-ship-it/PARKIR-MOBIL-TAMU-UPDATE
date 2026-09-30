@@ -89,6 +89,14 @@
 .btn-home:active{
   transform:scale(0.97);
 }
+    .visitor-toolbar{display:flex;gap:8px;margin:8px 0;}
+    .visitor-toolbar button{flex:1;margin-top:0;}
+    .btn-visitor{background:#16a085;}
+    .btn-visitor-danger{background:#e74c3c;}
+    .visitor-item{background:#252525;border-radius:10px;padding:10px;margin-top:8px;border-left:4px solid #16a085;}
+    .visitor-meta{font-size:12px;color:#bbb;line-height:1.5;word-break:break-word;}
+    .visitor-delete{background:#e74c3c;margin-top:8px;}
+
     .card{
       background:#1e1e1e;
       padding:12px;
@@ -264,6 +272,22 @@
 
   <div class="box total" id="visitorBox" style="display:none;">
     Visitor 0
+  </div>
+</div>
+
+<button id="visitorBtn" class="btn-visitor" onclick="openVisitorPanel()" style="display:none;width:100%;height:44px;">
+  👁️ LIHAT VISITOR
+</button>
+
+<div id="visitorOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.90);z-index:21000;overflow:auto;padding:18px;">
+  <div style="max-width:500px;margin:20px auto;background:#1e1e1e;border-radius:14px;padding:16px;box-shadow:0 10px 30px #000;">
+    <h3 style="margin-top:0;">👁️ DATA VISITOR</h3>
+    <div id="visitorSummary" style="color:#aaa;margin-bottom:8px;">Memuat visitor...</div>
+    <div class="visitor-toolbar">
+      <button type="button" class="btn-visitor-danger" onclick="deleteAllVisitors()">🗑️ HAPUS SEMUA</button>
+      <button type="button" class="btn-main" onclick="closeVisitorPanel()">✖ TUTUP</button>
+    </div>
+    <div id="visitorList"></div>
   </div>
 </div>
 
@@ -665,15 +689,131 @@ if(!localStorage.getItem(todayKey)){
   localStorage.setItem(todayKey,"1");
 }
 
-/* REALTIME COUNT */
-onSnapshot(visitorRef,(snap)=>{
-  const totalVisitor = snap.size;
+/* REALTIME VISITOR */
+let visitorDocs = [];
 
-  const box = document.getElementById("visitorBox");
-  if(box){
-    box.innerText = "Visitor " + totalVisitor;
+function escapeHtml(value){
+  return String(value ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+function renderVisitorList(){
+  const list = document.getElementById("visitorList");
+  const summary = document.getElementById("visitorSummary");
+  if(!list || !summary) return;
+
+  const sorted = [...visitorDocs].sort((a,b)=>{
+    const ta = Number(a.data.time || 0);
+    const tb = Number(b.data.time || 0);
+    return tb - ta;
+  });
+
+  summary.textContent = "Total visitor: " + sorted.length;
+
+  if(!sorted.length){
+    list.innerHTML = '<div class="card" style="text-align:center;color:#aaa;">Belum ada data visitor.</div>';
+    return;
   }
+
+  list.innerHTML = sorted.map((item,index)=>{
+    const d = item.data || {};
+    const waktu = d.time ? new Date(Number(d.time)).toLocaleString("id-ID") : "-";
+    return `
+      <div class="visitor-item">
+        <div style="font-weight:bold;">Visitor #${index + 1}</div>
+        <div class="visitor-meta">
+          📱 Perangkat: ${escapeHtml(d.device || "-")}<br>
+          🕒 Waktu: ${escapeHtml(waktu)}<br>
+          📄 Halaman: ${escapeHtml(d.page || "-")}<br>
+          🌐 User Agent: ${escapeHtml(d.userAgent || "-")}
+        </div>
+        <button type="button" class="visitor-delete" onclick="deleteVisitor('${item.id}')">
+          🗑️ HAPUS VISITOR INI
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+onSnapshot(visitorRef,(snap)=>{
+  visitorDocs = snap.docs.map(item=>({
+    id: item.id,
+    data: item.data()
+  }));
+
+  const totalVisitor = visitorDocs.length;
+  const box = document.getElementById("visitorBox");
+  if(box) box.innerText = "Visitor " + totalVisitor;
+
+  renderVisitorList();
 });
+
+window.openVisitorPanel=function(){
+  if(!isAdmin){
+    alert("Silakan login sebagai admin terlebih dahulu.");
+    return;
+  }
+  const overlay = document.getElementById("visitorOverlay");
+  if(overlay) overlay.style.display = "block";
+  renderVisitorList();
+};
+
+window.closeVisitorPanel=function(){
+  const overlay = document.getElementById("visitorOverlay");
+  if(overlay) overlay.style.display = "none";
+};
+
+window.deleteVisitor=async function(visitorId){
+  if(!isAdmin){
+    alert("Akses admin diperlukan.");
+    return;
+  }
+  if(!visitorId) return;
+
+  const target = visitorDocs.find(item=>item.id===visitorId);
+  const waktu = target?.data?.time
+    ? new Date(Number(target.data.time)).toLocaleString("id-ID")
+    : "visitor ini";
+
+  if(!confirm("Hapus visitor " + waktu + "?")) return;
+
+  try{
+    await deleteDoc(doc(db,"visitors",visitorId));
+    alert("Visitor berhasil dihapus. ✅");
+  }catch(err){
+    console.error("Gagal menghapus visitor:",err);
+    alert("Visitor gagal dihapus. Periksa koneksi dan izin Firebase.");
+  }
+};
+
+window.deleteAllVisitors=async function(){
+  if(!isAdmin){
+    alert("Akses admin diperlukan.");
+    return;
+  }
+
+  if(!visitorDocs.length){
+    alert("Tidak ada data visitor untuk dihapus.");
+    return;
+  }
+
+  if(!confirm("HAPUS SEMUA DATA VISITOR?\\n\\nTindakan ini tidak dapat dibatalkan.")) return;
+
+  try{
+    const docsToDelete = [...visitorDocs];
+    await Promise.all(
+      docsToDelete.map(item=>deleteDoc(doc(db,"visitors",item.id)))
+    );
+    alert("Semua data visitor berhasil dihapus. ✅");
+  }catch(err){
+    console.error("Gagal menghapus semua visitor:",err);
+    alert("Sebagian atau seluruh visitor gagal dihapus. Periksa izin Firebase.");
+  }
+};
 
 const ADMIN_SESSION_KEY = "parkir_admin_session";
 let isAdmin = localStorage.getItem(ADMIN_SESSION_KEY) === "1";
@@ -732,11 +872,16 @@ function applyAdminSession(){
     if(adminPanel) adminPanel.style.display="block";
     if(announcementForm) announcementForm.style.display="block";
     if(visitorBox) visitorBox.style.display="block";
+    const visitorBtn = document.getElementById("visitorBtn");
+    if(visitorBtn) visitorBtn.style.display="block";
     if(loginBtn){ loginBtn.textContent="🔓 LOGOUT ADMIN"; loginBtn.style.background="#c0392b"; }
   }else{
     if(adminPanel) adminPanel.style.display="none";
     if(announcementForm) announcementForm.style.display="none";
     if(visitorBox) visitorBox.style.display="none";
+    const visitorBtn = document.getElementById("visitorBtn");
+    if(visitorBtn) visitorBtn.style.display="none";
+    closeVisitorPanel();
     if(loginBtn){ loginBtn.textContent="🔐 LOGIN ADMIN"; loginBtn.style.background="#8e44ad"; }
   }
 }
