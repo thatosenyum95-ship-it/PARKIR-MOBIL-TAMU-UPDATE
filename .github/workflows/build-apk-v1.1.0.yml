@@ -129,6 +129,60 @@ jobs:
           npx cap sync android
           chmod +x android/gradlew
 
+      - name: Generate CEK VAR launcher icon
+        shell: bash
+        run: |
+          set -e
+
+          test -f assets/icon.png
+
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+          RES="android/app/src/main/res"
+
+          # Hapus launcher adaptive bawaan Capacitor supaya Android tidak
+          # mengambil icon default dan menimpa icon CEK VAR.
+          rm -rf "$RES/mipmap-anydpi" "$RES/mipmap-anydpi-v26"
+          find "$RES" -type f \( \\
+            -name 'ic_launcher.png' -o \\
+            -name 'ic_launcher_round.png' -o \\
+            -name 'ic_launcher.xml' -o \\
+            -name 'ic_launcher_round.xml' \\
+          \) -delete
+
+          mkdir -p \\
+            "$RES/mipmap-mdpi" \\
+            "$RES/mipmap-hdpi" \\
+            "$RES/mipmap-xhdpi" \\
+            "$RES/mipmap-xxhdpi" \\
+            "$RES/mipmap-xxxhdpi"
+
+          convert assets/icon.png -resize 48x48!   "$RES/mipmap-mdpi/ic_launcher.png"
+          convert assets/icon.png -resize 72x72!   "$RES/mipmap-hdpi/ic_launcher.png"
+          convert assets/icon.png -resize 96x96!   "$RES/mipmap-xhdpi/ic_launcher.png"
+          convert assets/icon.png -resize 144x144! "$RES/mipmap-xxhdpi/ic_launcher.png"
+          convert assets/icon.png -resize 192x192! "$RES/mipmap-xxxhdpi/ic_launcher.png"
+
+          cp "$RES/mipmap-mdpi/ic_launcher.png" "$RES/mipmap-mdpi/ic_launcher_round.png"
+          cp "$RES/mipmap-hdpi/ic_launcher.png" "$RES/mipmap-hdpi/ic_launcher_round.png"
+          cp "$RES/mipmap-xhdpi/ic_launcher.png" "$RES/mipmap-xhdpi/ic_launcher_round.png"
+          cp "$RES/mipmap-xxhdpi/ic_launcher.png" "$RES/mipmap-xxhdpi/ic_launcher_round.png"
+          cp "$RES/mipmap-xxxhdpi/ic_launcher.png" "$RES/mipmap-xxxhdpi/ic_launcher_round.png"
+
+          test -f "$RES/mipmap-mdpi/ic_launcher.png"
+          test -f "$RES/mipmap-hdpi/ic_launcher.png"
+          test -f "$RES/mipmap-xhdpi/ic_launcher.png"
+          test -f "$RES/mipmap-xxhdpi/ic_launcher.png"
+          test -f "$RES/mipmap-xxxhdpi/ic_launcher.png"
+
+          if find "$RES" -type f \( -name 'ic_launcher.xml' -o -name 'ic_launcher_round.xml' \) | grep -q .; then
+            echo "ERROR: adaptive launcher icon masih ada"
+            exit 1
+          fi
+
+          echo "CEK VAR launcher icon berhasil dipasang ke Android resources."
+
       - name: Prepare notification resources
         shell: bash
         run: |
