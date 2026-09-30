@@ -785,7 +785,7 @@ jobs:
           if gh release view "v1.2.7" >/dev/null 2>&1; then
             rm -rf /tmp/restore-v127
             mkdir -p /tmp/restore-v127
-            gh run download 36759683542 \\
+            gh run download 36759683542 \
               --repo "${GITHUB_REPOSITORY}" \\
               --name "parkir-mobil-tamu-v1.2.7-debug-apk" \\
               --dir /tmp/restore-v127
