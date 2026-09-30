@@ -663,9 +663,9 @@ jobs:
           if "async function capturePhoto" not in js:
               raise SystemExit("capturePhoto tidak ditemukan")
           if 'const APP_VERSION_CODE = 9;' not in js:
-              raise SystemExit("APP_VERSION_CODE bukan 8")
+              raise SystemExit("APP_VERSION_CODE bukan 9")
           if 'const APP_VERSION_NAME = "1.2.7";' not in js:
-              raise SystemExit("APP_VERSION_NAME bukan 1.2.6")
+              raise SystemExit("APP_VERSION_NAME bukan 1.2.7")
           print("Camera flow dan version constants: OK")
           PY
 
@@ -705,8 +705,8 @@ jobs:
           cp "$APK" dist/parkir-mobil-tamu-v1.2.7-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.6-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.6-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.7-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.7-debug.apk.sha256
 
           ls -lh dist/
 
@@ -715,8 +715,8 @@ jobs:
         with:
           name: parkir-mobil-tamu-v1.2.7-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.6-debug.apk
-            dist/parkir-mobil-tamu-v1.2.6-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.7-debug.apk
+            dist/parkir-mobil-tamu-v1.2.7-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -728,10 +728,10 @@ jobs:
 
           VERSION_NAME="1.2.7"
           VERSION_CODE="9"
-          APK="dist/parkir-mobil-tamu-v1.2.6-debug.apk"
+          APK="dist/parkir-mobil-tamu-v1.2.7-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.6-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.7-debug.apk"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
@@ -789,6 +789,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: ${VERSION_NAME}"
-          echo "VersionCode: ${VERSION_CODE}"
+          echo "Version: 1.2.7"
+          echo "VersionCode: 9"
           echo "========================================"
