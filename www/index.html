@@ -1748,28 +1748,55 @@ window.ANA = {
   starting:false,
 
   async speak(text){
+    const phrase=String(text||"").trim();
+    if(!phrase) return;
+
     try{
       if(NativeSpeechSynthesis){
-        await NativeSpeechSynthesis.speak({
-          text,
-          language:"id-ID",
-          rate:0.88,
-          pitch:1.12,
-          volume:0.92,
-          queueStrategy:"Flush"
-        });
-        return;
+        // Initialize/check native Android TTS before speaking so the first
+        // ANA response is not silently lost on an uninitialized engine.
+        if(NativeSpeechSynthesis.initialize){
+          await NativeSpeechSynthesis.initialize();
+        }
+
+        let available=true;
+        if(NativeSpeechSynthesis.isAvailable){
+          const result=await NativeSpeechSynthesis.isAvailable();
+          available=result?.isAvailable !== false;
+        }
+
+        if(available){
+          await NativeSpeechSynthesis.speak({
+            text:phrase,
+            language:"id-ID",
+            rate:0.88,
+            pitch:1.12,
+            volume:1.0,
+            queueStrategy:"Flush"
+          });
+          return;
+        }
+
+        console.warn("Native TTS tidak tersedia; memakai Web Speech fallback.");
       }
-    }catch(err){ console.warn("Native TTS gagal:",err); }
+    }catch(err){
+      console.warn("Native TTS gagal, memakai fallback:",err);
+    }
 
     if("speechSynthesis" in window){
-      const msg=new SpeechSynthesisUtterance(text);
-      msg.lang="id-ID";
-      msg.rate=0.88;
-      msg.pitch=1.12;
-      msg.volume=0.92;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(msg);
+      try{
+        const synth=window.speechSynthesis;
+        synth.cancel();
+
+        const msg=new SpeechSynthesisUtterance(phrase);
+        msg.lang="id-ID";
+        msg.rate=0.88;
+        msg.pitch=1.12;
+        msg.volume=1.0;
+        synth.speak(msg);
+      }catch(err){
+        console.warn("Web Speech TTS gagal:",err);
+      }
     }
   },
 
