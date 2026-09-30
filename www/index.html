@@ -1039,10 +1039,10 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-async function capturePhoto(source="CAMERA"){
+async async function capturePhoto(source="CAMERA"){
   const mode = source === "PHOTOS" ? "PHOTOS" : "CAMERA";
 
-  if(!NativeCamera?.getPhoto){
+  if(!NativeCamera || typeof NativeCamera.getPhoto !== "function"){
     throw new Error("Plugin kamera native tidak tersedia");
   }
 
