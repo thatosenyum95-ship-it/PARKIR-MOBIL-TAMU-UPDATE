@@ -669,14 +669,20 @@ if(!localStorage.getItem(todayKey)){
 }
 
 /* REALTIME COUNT */
-onSnapshot(visitorRef,(snap)=>{
-  const totalVisitor = snap.size;
+let stopVisitorSnapshot = null;
 
-  const box = document.getElementById("visitorBox");
-  if(box){
-    box.innerText = "Visitor " + totalVisitor;
+function syncVisitorListener(){
+  if(stopVisitorSnapshot){
+    stopVisitorSnapshot();
+    stopVisitorSnapshot = null;
   }
-});
+  if(!isAdmin) return;
+  stopVisitorSnapshot = onSnapshot(visitorRef,(snap)=>{
+    const totalVisitor = snap.size;
+    const box = document.getElementById("visitorBox");
+    if(box) box.innerText = "Visitor " + totalVisitor;
+  }, err => console.warn("Visitor listener gagal:", err));
+}
 
 let isAdmin = false;
 let authReady = false;
@@ -811,6 +817,7 @@ onAuthStateChanged(auth, async (user)=>{
   isAdmin = await refreshAdminRole(user);
   authReady = true;
   applyAdminSession();
+  syncVisitorListener();
 });
 
 applyAdminSession();
@@ -848,19 +855,28 @@ window.hapusPengumuman = async function(id){
 };
 window.kirimBalasan = async function(id){
 
+  if(!auth.currentUser){
+    alert("Untuk membalas pengumuman, silakan login terlebih dahulu.");
+    return;
+  }
+
   const input = document.getElementById("input-"+id);
   if(!input) return;
 
   const teks = input.value.trim();
   if(!teks) return;
 
-  await addDoc(collection(db,"pengumuman",id,"balasan"),{
-    isi: teks,
-    pengirim: isAdmin ? "Admin" : "User",
-    waktu: Date.now()
-  });
-
-  input.value="";
+  try{
+    await addDoc(collection(db,"pengumuman",id,"balasan"),{
+      isi: teks,
+      pengirim: isAdmin ? "Admin" : (auth.currentUser.email || "User"),
+      waktu: Date.now()
+    });
+    input.value="";
+  }catch(err){
+    console.error("Balasan gagal:",err);
+    alert("Balasan gagal dikirim. Periksa koneksi dan login.");
+  }
 };
 /* VALIDASI + ADD */
 function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
@@ -1195,20 +1211,10 @@ function render(){
 
     return (
       (d.nama||"") +
-      (d.plat||"") +
+      (Array.isArray(d.plat) ? d.plat.join(" ") : (d.plat||"")) +
       (d.kamar||"")
     ).toLowerCase().includes(searchValue);
   })
-.filter(d=>{
-  if(mode==="masuk" && d.status!=="Masuk") return false;
-  if(mode==="keluar" && d.status!=="Keluar") return false;
-
-  return (
-    (d.nama||"") +
-    (d.plat||"") +
-    (d.kamar||"")
-  ).toLowerCase().includes(searchValue);
-})
 .forEach(d=>{
 
   if(d.status==="Masuk") masuk++; else keluar++;
@@ -1235,6 +1241,8 @@ function render(){
       const plat = Array.isArray(d.plat) ? d.plat[i] || "-" : d.plat || "-";
       const posisi = Array.isArray(d.posisi) ? d.posisi[i] || "-" : (i === 0 ? (d.posisi || "-") : "-");
 
+      const photoSrc = safeUrl(f);
+      if(!photoSrc) return "";
       return `
         <div style="margin-top:10px;">
 
@@ -1246,7 +1254,7 @@ ${d.status==="Masuk"
   ? `<div class="countdown">⏳ ${getCountdown()}</div>`
   : ""
 }
-          <img src="${f}" onclick="openImg('${f}')">
+          <img src="${escapeHtml(photoSrc)}" onclick="openImg(this.src)">
 
         </div>
       `;
@@ -1288,12 +1296,17 @@ window.checkoutMobil = async function(id,index){
   if(!data) return;
   await window.checkout(id);
 };
-window.checkout=id=>{
-  if(confirm("Yakin keluar?")){
-    updateDoc(doc(db,"parkir",id),{
+window.checkout=async id=>{
+  if(!isAdmin){ alert("Login dulu sebagai admin ❌"); return; }
+  if(!confirm("Yakin keluar?")) return;
+  try{
+    await updateDoc(doc(db,"parkir",id),{
       status:"Keluar",
       waktuKeluar:Date.now()
     });
+  }catch(err){
+    console.error("Checkout gagal:",err);
+    alert("Checkout gagal. Periksa koneksi atau hak akses admin.");
   }
 };
 window.addEventListener("DOMContentLoaded", () => {
@@ -1414,9 +1427,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
 });
 /* HAPUS */
-window.hapus=id=>{
-  if(confirm("Yakin ingin menghapus data ini?")){
-    deleteDoc(doc(db,"parkir",id));
+window.hapus=async id=>{
+  if(!isAdmin){ alert("Login dulu sebagai admin ❌"); return; }
+  if(!confirm("Yakin ingin menghapus data ini?")) return;
+  try{
+    await deleteDoc(doc(db,"parkir",id));
+  }catch(err){
+    console.error("Hapus data gagal:",err);
+    alert("Data gagal dihapus. Periksa koneksi atau hak akses admin.");
   }
 };
 
