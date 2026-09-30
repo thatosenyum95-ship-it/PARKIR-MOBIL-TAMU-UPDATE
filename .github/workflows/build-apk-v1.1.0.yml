@@ -257,6 +257,7 @@ jobs:
               raise SystemExit("Root AndroidManifest bukan <manifest>")
 
           permissions = {
+              "android.permission.CAMERA",
               "android.permission.POST_NOTIFICATIONS",
               "android.permission.REQUEST_INSTALL_PACKAGES",
           }
