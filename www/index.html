@@ -547,6 +547,29 @@ const NativeSpeechRecognition = NativePlugins.SpeechRecognition;
 const NativeSpeechSynthesis = NativePlugins.SpeechSynthesis;
 const NativeCamera = NativePlugins.Camera;
 const NativeFirebaseMessaging = NativePlugins.FirebaseMessaging;
+
+async function requestCameraPermission(){
+  if(!NativeCamera?.requestPermissions) return true;
+
+  try{
+    let permission = await NativeCamera.checkPermissions?.();
+
+    if(permission?.camera !== "granted"){
+      permission = await NativeCamera.requestPermissions({ permissions: ["camera"] });
+    }
+
+    if(permission?.camera !== "granted"){
+      alert("Izin kamera belum diberikan. Silakan izinkan akses kamera di pengaturan Android agar bisa mengambil foto.");
+      return false;
+    }
+
+    return true;
+  }catch(err){
+    console.error("Izin kamera gagal:", err);
+    alert("Tidak dapat meminta izin kamera. Silakan cek izin Kamera di Pengaturan Android.");
+    return false;
+  }
+}
 const NativeLocalNotifications = NativePlugins.LocalNotifications;
 const FCM_TOPIC = "parkir_semua";
 const FCM_CHANNEL_ID = "pengumuman_fcm_v3";
@@ -988,6 +1011,11 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
 window.takeVehiclePhoto = async function(slot, source="CAMERA"){
   try{
     let dataUrl="";
+
+    if(source !== "PHOTOS" && NativeCamera){
+      const allowed = await requestCameraPermission();
+      if(!allowed) return;
+    }
 
     if(NativeCamera){
       const photo=await NativeCamera.getPhoto({
@@ -1550,6 +1578,12 @@ window.takeEditPhoto=async function(slot, source="CAMERA"){
   if(!editingId) return;
   try{
     let dataUrl="";
+
+    if(source !== "PHOTOS" && NativeCamera){
+      const allowed = await requestCameraPermission();
+      if(!allowed) return;
+    }
+
     if(NativeCamera){
       const photo=await NativeCamera.getPhoto({quality:72,width:1280,height:1280,correctOrientation:true,source:source==="PHOTOS"?"PHOTOS":"CAMERA",resultType:"dataUrl"});
       dataUrl=photo?.dataUrl||"";
