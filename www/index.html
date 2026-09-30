@@ -453,7 +453,7 @@ const db = getFirestore(app);
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
 const APP_PACKAGE_NAME = "com.parkiranmobiltamu.app";
 const APP_VERSION_CODE = 6;
-const APP_VERSION_NAME = "1.2.3";
+const APP_VERSION_NAME = "1.2.4";
 const APP_UPDATE_CHANNEL_ID = "app_update";
 let updateManifestCache = null;
 
@@ -548,27 +548,6 @@ const NativeSpeechSynthesis = NativePlugins.SpeechSynthesis;
 const NativeCamera = NativePlugins.Camera;
 const NativeFirebaseMessaging = NativePlugins.FirebaseMessaging;
 
-async function requestCameraPermission(){
-  // Camera.getPhoto() milik Capacitor menangani permission kamera sendiri.
-  // Jangan memblokir jalur fallback hanya karena check/request permission native gagal.
-  if(!NativeCamera?.checkPermissions) return true;
-
-  try{
-    const permission = await NativeCamera.checkPermissions();
-    if(permission?.camera === "granted") return true;
-
-    if(NativeCamera.requestPermissions){
-      const requested = await NativeCamera.requestPermissions({ permissions: ["camera"] });
-      if(requested?.camera === "granted") return true;
-    }
-  }catch(err){
-    console.warn("Permission kamera native gagal dicek/diminta; lanjut ke jalur kamera fallback:", err);
-  }
-
-  // false berarti native permission belum tersedia; capturePhoto() tetap
-  // mencoba HTML file input yang dapat membuka aplikasi Kamera Android.
-  return false;
-}
 const NativeLocalNotifications = NativePlugins.LocalNotifications;
 const FCM_TOPIC = "parkir_semua";
 const FCM_CHANNEL_ID = "pengumuman_fcm_v4";
@@ -1039,7 +1018,7 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-async async function capturePhoto(source="CAMERA"){
+async function capturePhoto(source="CAMERA"){
   const mode = source === "PHOTOS" ? "PHOTOS" : "CAMERA";
 
   if(!NativeCamera || typeof NativeCamera.getPhoto !== "function"){
