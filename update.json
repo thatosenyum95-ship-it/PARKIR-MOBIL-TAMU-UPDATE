@@ -6,7 +6,7 @@
   "minimumVersionCode": 1,
   "mandatory": false,
   "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.0/parkir-mobil-tamu-v1.2.0-debug.apk",
-  "sha256": "93813e5647ec2e63bb7ef43a870271ad6bd4ac4489cfacc86af53a4040a37b95",
+  "sha256": "8d8fa3c2326e80dc5cab2faff90fe89cdf888aaa2802aa1d4c2f287d13ce73a8",
   "changelog": [
     "Visitor sekarang dapat dilihat oleh admin.",
     "Visitor dapat dihapus satu per satu atau sekaligus.",
