@@ -769,8 +769,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add update.json
-          git diff --cached --quiet || git commit -m "Update release manifest to ${VERSION_NAME}"
-          git push
+          if ! git diff --cached --quiet; then
+            git commit -m "Update release manifest to ${VERSION_NAME} [skip ci]"
+          fi
+
+          # Main may receive a commit while this workflow is building.
+          # Rebase the manifest commit onto the latest main before pushing.
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
 
       - name: Build success
         shell: bash
@@ -778,6 +785,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.2.4"
-          echo "VersionCode: 6"
+          echo "Version: ${VERSION_NAME}"
+          echo "VersionCode: ${VERSION_CODE}"
           echo "========================================"
