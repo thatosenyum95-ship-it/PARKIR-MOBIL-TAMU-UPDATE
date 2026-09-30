@@ -136,8 +136,7 @@ jobs:
 
           test -f assets/icon.png
 
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
+          command -v convert >/dev/null 2>&1 || { echo "ERROR: ImageMagick convert tidak tersedia"; exit 1; }
 
           RES="android/app/src/main/res"
 
