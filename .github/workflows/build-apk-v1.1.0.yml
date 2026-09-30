@@ -253,6 +253,7 @@ jobs:
 
           permissions = {
               "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
               "android.permission.POST_NOTIFICATIONS",
               "android.permission.REQUEST_INSTALL_PACKAGES",
           }
@@ -585,6 +586,9 @@ jobs:
           cat > android/app/src/main/res/xml/file_paths.xml <<'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <!-- Capacitor Camera stores captured images in externalFilesDir/Pictures. -->
+              <external-files-path name="camera_images" path="Pictures/" />
+              <!-- App updater cache. -->
               <cache-path name="update_cache" path="updates/" />
               <cache-path name="root_cache" path="." />
           </paths>
@@ -662,11 +666,25 @@ jobs:
               raise SystemExit("Sintaks capturePhoto masih mengandung async async")
           if "async function capturePhoto" not in js:
               raise SystemExit("capturePhoto tidak ditemukan")
+          if "NativeCamera" not in js:
+              raise SystemExit("NativeCamera tidak ditemukan")
+          if "NativeSpeechRecognition" not in js:
+              raise SystemExit("ANA SpeechRecognition tidak ditemukan")
+          if "NativeSpeechSynthesis" not in js:
+              raise SystemExit("ANA SpeechSynthesis tidak ditemukan")
+          manifest_text = Path("android/app/src/main/AndroidManifest.xml").read_text()
+          if "android.permission.CAMERA" not in manifest_text:
+              raise SystemExit("Permission CAMERA tidak ditemukan")
+          if "android.permission.RECORD_AUDIO" not in manifest_text:
+              raise SystemExit("Permission RECORD_AUDIO untuk ANA tidak ditemukan")
+          file_paths = Path("android/app/src/main/res/xml/file_paths.xml").read_text()
+          if "external-files-path" not in file_paths:
+              raise SystemExit("FileProvider external-files-path untuk Camera tidak ditemukan")
           if 'const APP_VERSION_CODE = 9;' not in js:
               raise SystemExit("APP_VERSION_CODE bukan 9")
           if 'const APP_VERSION_NAME = "1.2.7";' not in js:
               raise SystemExit("APP_VERSION_NAME bukan 1.2.7")
-          print("Camera flow dan version constants: OK")
+          print("Camera + ANA + permissions + FileProvider + version validation: OK")
           PY
 
           node --check /tmp/parkir-main.js
