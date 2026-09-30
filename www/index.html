@@ -452,8 +452,8 @@ const db = getFirestore(app);
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
 const APP_PACKAGE_NAME = "com.parkiranmobiltamu.app";
-const APP_VERSION_CODE = 8;
-const APP_VERSION_NAME = "1.2.6";
+const APP_VERSION_CODE = 9;
+const APP_VERSION_NAME = "1.2.7";
 const APP_UPDATE_CHANNEL_ID = "app_update";
 let updateManifestCache = null;
 
@@ -1041,43 +1041,13 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-async function requestCameraPermission(){
-  if(!NativeCamera?.requestPermissions) return true;
-
-  try{
-    let permission = await NativeCamera.checkPermissions?.();
-
-    if(permission?.camera !== "granted"){
-      permission = await NativeCamera.requestPermissions({
-        permissions:["camera"]
-      });
-    }
-
-    return permission?.camera === "granted";
-  }catch(err){
-    console.error("Permission kamera gagal:",err);
-    return false;
-  }
-}
-
 async function capturePhoto(source="CAMERA"){
   const useCamera = source !== "PHOTOS";
-
   if(!NativeCamera?.getPhoto){
     console.error("Plugin Camera native tidak tersedia.");
     return "";
   }
-
-  // Untuk kamera, pastikan permission native tersedia terlebih dahulu.
-  // Tidak ada alert dan tidak ada fallback ke file picker.
-  if(useCamera){
-    const allowed = await requestCameraPermission();
-    if(!allowed) return "";
-  }
-
   try{
-    // Pola ini dibuat sama dengan jalur kamera APK lama:
-    // langsung Camera.getPhoto(), dengan CAMERA atau PHOTOS yang tegas.
     const photo = await NativeCamera.getPhoto({
       quality:72,
       width:1280,
@@ -1086,7 +1056,6 @@ async function capturePhoto(source="CAMERA"){
       source:useCamera ? "CAMERA" : "PHOTOS",
       resultType:"dataUrl"
     });
-
     return photo?.dataUrl || "";
   }catch(err){
     console.error(
@@ -1099,41 +1068,65 @@ async function capturePhoto(source="CAMERA"){
 
 window.takeVehiclePhoto = async function(slot, source="CAMERA"){
   try{
-    const dataUrl=await capturePhoto(source);
+    let dataUrl="";
 
-    if(!dataUrl){
-      // Batal/gagal tidak menampilkan pesan panjang.
-      applyAdminSession();
-      return;
+    if(NativeCamera){
+      const photo=await NativeCamera.getPhoto({
+        quality:72,
+        width:1280,
+        height:1280,
+        correctOrientation:true,
+        source: source === "PHOTOS" ? "PHOTOS" : "CAMERA",
+        resultType:"dataUrl"
+      });
+      dataUrl=photo?.dataUrl || "";
+    }else{
+      const input=document.createElement("input");
+      input.type="file";
+      input.accept="image/*";
+      if(source !== "PHOTOS") input.capture="environment";
+      input.click();
+      await new Promise(resolve=>input.onchange=resolve);
+      const file=input.files?.[0];
+      if(file){
+        dataUrl=await new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>resolve(reader.result);
+          reader.onerror=reject;
+          reader.readAsDataURL(file);
+        });
+      }
     }
 
-    const compressed=await compressPhotoDataUrl(dataUrl,1000,0.65);
+    if(!dataUrl) return;
+    dataUrl=await compressPhotoDataUrl(dataUrl,1000,0.65);
 
     const field=document.getElementById("foto"+slot);
     const img=document.getElementById("photoImg"+slot);
     const preview=document.getElementById("photoPreview"+slot);
     const retake=document.getElementById("retakeBtn"+slot);
 
-    field.value=compressed;
-    img.src=compressed;
+    field.value=dataUrl;
+    img.src=dataUrl;
     preview.style.display="block";
     retake.style.display="block";
 
     if(slot===1){
-      document.getElementById("cameraBtn1").innerText =
-        source === "PHOTOS"
-          ? "🖼️ FOTO 1 DARI GALERI"
-          : "📸 FOTO MOBIL 1 SUDAH DIAMBIL";
-
-      document.getElementById("galleryBtn1").innerText =
-        "🖼️ GANTI FOTO DARI GALERI";
-
+      document.getElementById("cameraBtn1").innerText=source === "PHOTOS" ? "🖼️ FOTO 1 DARI GALERI" : "📸 FOTO MOBIL 1 SUDAH DIAMBIL";
+      document.getElementById("galleryBtn1").innerText="🖼️ GANTI FOTO DARI GALERI";
       document.getElementById("dataFields").style.display="block";
       applyAdminSession();
       document.getElementById("nama").focus();
     }
   }catch(err){
     console.error("Media foto gagal:",err);
+    const msg=String(err?.message || err || "");
+    if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return;
+    if(source === "PHOTOS") {
+      alert("Galeri tidak bisa dibuka. Pastikan izin foto/media diberikan.");
+    }else{
+      alert("Kamera tidak bisa dibuka. Pastikan izin kamera diberikan.");
+    }
     applyAdminSession();
   }
 };
