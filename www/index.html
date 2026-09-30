@@ -1652,29 +1652,26 @@ window.closeEditData=function(){
 
 window.takeEditPhoto=async function(slot, source="CAMERA"){
   if(!editingId) return;
+
   try{
-    let dataUrl="";
-
-    if(source !== "PHOTOS" && NativeCamera){
-      const allowed = await requestCameraPermission();
-      if(!allowed) return;
-    }
-
-    if(NativeCamera){
-      const photo=await NativeCamera.getPhoto({quality:72,width:1280,height:1280,correctOrientation:true,source:source==="PHOTOS"?"PHOTOS":"CAMERA",resultType:"dataUrl"});
-      dataUrl=photo?.dataUrl||"";
-    }else{
-      const input=document.createElement("input"); input.type="file"; input.accept="image/*"; if(source!=="PHOTOS") input.capture="environment";
-      input.click(); await new Promise(resolve=>input.onchange=resolve);
-      const file=input.files?.[0]; if(file){ dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);}); }
-    }
+    const dataUrl=await capturePhoto(source);
     if(!dataUrl) return;
-    dataUrl=await compressPhotoDataUrl(dataUrl,1000,0.65);
-    if(slot===1) editingFoto1=dataUrl; else editingFoto2=dataUrl;
-    const im=document.getElementById("editPreview"+slot); im.src=dataUrl; im.style.display="block";
+
+    const compressed=await compressPhotoDataUrl(dataUrl,1000,0.65);
+    if(slot===1) editingFoto1=compressed;
+    else editingFoto2=compressed;
+
+    const im=document.getElementById("editPreview"+slot);
+    im.src=compressed;
+    im.style.display="block";
   }catch(err){
-    const msg=String(err?.message||err||""); if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return;
-    alert(source==="PHOTOS"?"Galeri tidak bisa dibuka.":"Kamera tidak bisa dibuka.");
+    console.error("Foto edit gagal:",err);
+    const msg=String(err?.message || err || "");
+    if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return;
+
+    alert(source==="PHOTOS"
+      ? "Galeri tidak bisa dibuka. Coba lagi."
+      : "Kamera tidak bisa dibuka. Coba lagi atau periksa izin Kamera Android.");
   }
 };
 
