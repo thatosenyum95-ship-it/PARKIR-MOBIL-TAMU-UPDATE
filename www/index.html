@@ -452,8 +452,8 @@ const db = getFirestore(app);
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
 const APP_PACKAGE_NAME = "com.parkiranmobiltamu.app";
-const APP_VERSION_CODE = 6;
-const APP_VERSION_NAME = "1.2.4";
+const APP_VERSION_CODE = 7;
+const APP_VERSION_NAME = "1.2.5";
 const APP_UPDATE_CHANNEL_ID = "app_update";
 let updateManifestCache = null;
 
@@ -1018,33 +1018,56 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-async function capturePhoto(source="CAMERA"){
-  const mode = source === "PHOTOS" ? "PHOTOS" : "CAMERA";
+async function requestCameraPermission(){
+  if(!NativeCamera?.requestPermissions) return true;
 
-  if(!NativeCamera || typeof NativeCamera.getPhoto !== "function"){
+  try{
+    let permission = await NativeCamera.checkPermissions?.();
+
+    if(permission?.camera !== "granted"){
+      permission = await NativeCamera.requestPermissions({
+        permissions:["camera"]
+      });
+    }
+
+    return permission?.camera === "granted";
+  }catch(err){
+    console.error("Permission kamera gagal:",err);
+    return false;
+  }
+}
+
+async function capturePhoto(source="CAMERA"){
+  const useCamera = source !== "PHOTOS";
+
+  if(!NativeCamera?.getPhoto){
     console.error("Plugin Camera native tidak tersedia.");
     return "";
   }
 
+  // Untuk kamera, pastikan permission native tersedia terlebih dahulu.
+  // Tidak ada alert dan tidak ada fallback ke file picker.
+  if(useCamera){
+    const allowed = await requestCameraPermission();
+    if(!allowed) return "";
+  }
+
   try{
-    // Mengikuti pola kamera dari APK lama yang sudah bekerja:
-    // langsung panggil Camera.getPhoto() tanpa checkPermissions/requestPermissions
-    // manual. Plugin Capacitor menangani alur permission Android.
+    // Pola ini dibuat sama dengan jalur kamera APK lama:
+    // langsung Camera.getPhoto(), dengan CAMERA atau PHOTOS yang tegas.
     const photo = await NativeCamera.getPhoto({
       quality:72,
       width:1280,
       height:1280,
       correctOrientation:true,
-      source:mode,
+      source:useCamera ? "CAMERA" : "PHOTOS",
       resultType:"dataUrl"
     });
 
     return photo?.dataUrl || "";
   }catch(err){
     console.error(
-      mode === "CAMERA"
-        ? "Kamera native gagal:"
-        : "Galeri native gagal:",
+      useCamera ? "Kamera native gagal:" : "Galeri native gagal:",
       err
     );
     return "";
@@ -1054,9 +1077,9 @@ async function capturePhoto(source="CAMERA"){
 window.takeVehiclePhoto = async function(slot, source="CAMERA"){
   try{
     const dataUrl=await capturePhoto(source);
+
     if(!dataUrl){
-      // Tidak menampilkan alert/error panjang ke pengguna.
-      // Tombol KAMERA tetap khusus kamera dan GALERI tetap khusus galeri.
+      // Batal/gagal tidak menampilkan pesan panjang.
       applyAdminSession();
       return;
     }
@@ -1074,8 +1097,14 @@ window.takeVehiclePhoto = async function(slot, source="CAMERA"){
     retake.style.display="block";
 
     if(slot===1){
-      document.getElementById("cameraBtn1").innerText=source === "PHOTOS" ? "🖼️ FOTO 1 DARI GALERI" : "📸 FOTO MOBIL 1 SUDAH DIAMBIL";
-      document.getElementById("galleryBtn1").innerText="🖼️ GANTI FOTO DARI GALERI";
+      document.getElementById("cameraBtn1").innerText =
+        source === "PHOTOS"
+          ? "🖼️ FOTO 1 DARI GALERI"
+          : "📸 FOTO MOBIL 1 SUDAH DIAMBIL";
+
+      document.getElementById("galleryBtn1").innerText =
+        "🖼️ GANTI FOTO DARI GALERI";
+
       document.getElementById("dataFields").style.display="block";
       applyAdminSession();
       document.getElementById("nama").focus();
