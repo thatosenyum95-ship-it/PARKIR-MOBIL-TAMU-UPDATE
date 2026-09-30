@@ -709,8 +709,8 @@ jobs:
               raise SystemExit("FileProvider external-files-path untuk Camera tidak ditemukan")
           if 'const APP_VERSION_CODE = 10;' not in js:
               raise SystemExit("APP_VERSION_CODE bukan 10")
-          if 'const APP_VERSION_NAME = "1.2.7";' not in js:
-              raise SystemExit("APP_VERSION_NAME bukan 1.2.7")
+          if 'const APP_VERSION_NAME = "1.2.8";' not in js:
+              raise SystemExit("APP_VERSION_NAME bukan 1.2.8")
           print("Camera + ANA + permissions + FileProvider + version validation: OK")
           PY
 
