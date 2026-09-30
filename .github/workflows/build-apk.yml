@@ -88,6 +88,13 @@ jobs:
           cp assets/icon.png android/app/src/main/res/drawable/cek_var_icon.png
           cp assets/push_icon.png android/app/src/main/res/drawable/push_icon.png
 
+          # Capacitor generates Android 8+ adaptive-icon XMLs by default.
+          # Those XMLs still point to the default Capacitor foreground (the blue X),
+          # so Android ignores the PNGs above. Remove them so @mipmap/ic_launcher
+          # resolves to our CEK VAR PNG on Android/Samsung launchers.
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
       - name: Configure Google Services plugin
         shell: bash
         run: |
