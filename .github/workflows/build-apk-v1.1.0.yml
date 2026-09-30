@@ -778,6 +778,22 @@ jobs:
           TAG="v${VERSION_NAME}"
           RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.7-debug.apk"
 
+          # Restore the previously verified v1.2.7 APK asset if an earlier
+          # build accidentally clobbered that release asset. This keeps old
+          # installations and the v1.2.7 release download consistent.
+          if gh release view "v1.2.7" >/dev/null 2>&1; then
+            rm -rf /tmp/restore-v127
+            mkdir -p /tmp/restore-v127
+            gh run download 36759683542 \\
+              --repo "${GITHUB_REPOSITORY}" \\
+              --name "parkir-mobil-tamu-v1.2.7-debug-apk" \\
+              --dir /tmp/restore-v127
+            RESTORE_APK=$(find /tmp/restore-v127 -type f -name "parkir-mobil-tamu-v1.2.7-debug.apk" | head -n 1)
+            test -n "$RESTORE_APK"
+            gh release upload "v1.2.7" "$RESTORE_APK" --clobber
+            echo "v1.2.7 APK asset restored from verified run #74."
+          fi
+
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
           else
