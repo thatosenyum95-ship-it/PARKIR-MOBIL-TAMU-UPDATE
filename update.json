@@ -1,12 +1,12 @@
 {
   "appName": "PARKIR MOBIL TAMU",
   "packageName": "com.parkiranmobiltamu.app",
-  "latestVersionCode": 3,
-  "latestVersionName": "1.2.0",
+  "latestVersionCode": 4,
+  "latestVersionName": "1.2.1",
   "minimumVersionCode": 1,
   "mandatory": false,
-  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.0/parkir-mobil-tamu-v1.2.0-debug.apk",
-  "sha256": "99a8d8139394add062498474be5ac581ea8f10db895cda2d550878bd26d8a64f",
+  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.1/parkir-mobil-tamu-v1.2.1-debug.apk",
+  "sha256": "9ce823e43e6966d5f8aff803b528541c06fa3195dfdd346a4e5ff6de1711af1d",
   "changelog": [
     "Visitor sekarang dapat dilihat oleh admin.",
     "Visitor dapat dihapus satu per satu atau sekaligus.",
