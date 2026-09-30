@@ -726,9 +726,9 @@ jobs:
               "downloadUrl": "${RELEASE_URL}",
               "sha256": "${SHA256}",
               "changelog": [
-                  "Visitor sekarang dapat dilihat oleh admin.",
-                  "Visitor dapat dihapus satu per satu atau sekaligus.",
-                  "Penyelarasan VersionName 1.1.0 dan VersionCode 2."
+                  "Perbaikan kamera Android dengan fallback ke Kamera sistem.",
+                  "Perbaikan jalur foto galeri dan kamera saat plugin native gagal.",
+                  "VersionName 1.2.2 dan VersionCode 5."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
