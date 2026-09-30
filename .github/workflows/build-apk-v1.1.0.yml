@@ -747,21 +747,21 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.7-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.8-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.7-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.7-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.8-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.8-debug.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.7-debug-apk
+          name: parkir-mobil-tamu-v1.2.8-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.7-debug.apk
-            dist/parkir-mobil-tamu-v1.2.7-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.8-debug.apk
+            dist/parkir-mobil-tamu-v1.2.8-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -771,9 +771,9 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.7"
-          VERSION_CODE="9"
-          APK="dist/parkir-mobil-tamu-v1.2.7-debug.apk"
+          VERSION_NAME="1.2.8"
+          VERSION_CODE="10"
+          APK="dist/parkir-mobil-tamu-v1.2.8-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
           RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.7-debug.apk"
@@ -813,7 +813,7 @@ jobs:
                   "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
                   "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
                   "Kamera dipertahankan mengikuti APK lama yang sudah bekerja.",
-                  "VersionName 1.2.7 dan VersionCode 9."
+                  "VersionName 1.2.8 dan VersionCode 10."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
@@ -831,6 +831,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.2.7"
-          echo "VersionCode: 9"
+          echo "Version: 1.2.8"
+          echo "VersionCode: 10"
           echo "========================================"
