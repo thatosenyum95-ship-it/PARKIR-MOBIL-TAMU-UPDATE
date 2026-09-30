@@ -134,46 +134,38 @@ jobs:
         run: |
           set -e
 
-          test -f assets/icon.png
-
-          command -v convert >/dev/null 2>&1 || { echo "ERROR: ImageMagick convert tidak tersedia"; exit 1; }
+          test -s assets/icon.png
 
           RES="android/app/src/main/res"
 
           # Hapus launcher adaptive bawaan Capacitor supaya Android tidak
           # mengambil icon default dan menimpa icon CEK VAR.
           rm -rf "$RES/mipmap-anydpi" "$RES/mipmap-anydpi-v26"
-          find "$RES" -type f \( \\
-            -name 'ic_launcher.png' -o \\
-            -name 'ic_launcher_round.png' -o \\
-            -name 'ic_launcher.xml' -o \\
-            -name 'ic_launcher_round.xml' \\
+          find "$RES" -type f \( \
+            -name 'ic_launcher.png' -o \
+            -name 'ic_launcher_round.png' -o \
+            -name 'ic_launcher.xml' -o \
+            -name 'ic_launcher_round.xml' \
           \) -delete
 
-          mkdir -p \\
-            "$RES/mipmap-mdpi" \\
-            "$RES/mipmap-hdpi" \\
-            "$RES/mipmap-xhdpi" \\
-            "$RES/mipmap-xxhdpi" \\
+          mkdir -p \
+            "$RES/mipmap-mdpi" \
+            "$RES/mipmap-hdpi" \
+            "$RES/mipmap-xhdpi" \
+            "$RES/mipmap-xxhdpi" \
             "$RES/mipmap-xxxhdpi"
 
-          convert assets/icon.png -resize 48x48!   "$RES/mipmap-mdpi/ic_launcher.png"
-          convert assets/icon.png -resize 72x72!   "$RES/mipmap-hdpi/ic_launcher.png"
-          convert assets/icon.png -resize 96x96!   "$RES/mipmap-xhdpi/ic_launcher.png"
-          convert assets/icon.png -resize 144x144! "$RES/mipmap-xxhdpi/ic_launcher.png"
-          convert assets/icon.png -resize 192x192! "$RES/mipmap-xxxhdpi/ic_launcher.png"
+          # Pakai file CEK VAR asli tanpa ImageMagick/resize.
+          # Android akan melakukan scaling sesuai density perangkat.
+          for dir in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp assets/icon.png "$RES/mipmap-$dir/ic_launcher.png"
+            cp assets/icon.png "$RES/mipmap-$dir/ic_launcher_round.png"
+          done
 
-          cp "$RES/mipmap-mdpi/ic_launcher.png" "$RES/mipmap-mdpi/ic_launcher_round.png"
-          cp "$RES/mipmap-hdpi/ic_launcher.png" "$RES/mipmap-hdpi/ic_launcher_round.png"
-          cp "$RES/mipmap-xhdpi/ic_launcher.png" "$RES/mipmap-xhdpi/ic_launcher_round.png"
-          cp "$RES/mipmap-xxhdpi/ic_launcher.png" "$RES/mipmap-xxhdpi/ic_launcher_round.png"
-          cp "$RES/mipmap-xxxhdpi/ic_launcher.png" "$RES/mipmap-xxxhdpi/ic_launcher_round.png"
-
-          test -f "$RES/mipmap-mdpi/ic_launcher.png"
-          test -f "$RES/mipmap-hdpi/ic_launcher.png"
-          test -f "$RES/mipmap-xhdpi/ic_launcher.png"
-          test -f "$RES/mipmap-xxhdpi/ic_launcher.png"
-          test -f "$RES/mipmap-xxxhdpi/ic_launcher.png"
+          for dir in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            test -s "$RES/mipmap-$dir/ic_launcher.png"
+            test -s "$RES/mipmap-$dir/ic_launcher_round.png"
+          done
 
           if find "$RES" -type f \( -name 'ic_launcher.xml' -o -name 'ic_launcher_round.xml' \) | grep -q .; then
             echo "ERROR: adaptive launcher icon masih ada"
