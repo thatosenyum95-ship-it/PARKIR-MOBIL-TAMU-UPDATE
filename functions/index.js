@@ -32,16 +32,29 @@ exports.sendAnnouncementPush = onDocumentCreated(
 );
 
 exports.autoCheckoutAtTen = onSchedule(
-  { schedule: "every 1 minutes", timeZone: "Asia/Jakarta", region: "asia-southeast2" },
+  { schedule: "every 1 minutes", timeZone: "Asia/Makassar", region: "asia-southeast2" },
   async () => {
-    const now = new Date();
-    const cutoff = new Date(now);
-    cutoff.setHours(10, 0, 0, 0);
-    if (now < cutoff) return null;
+    // Pontianak uses WITA (Asia/Makassar). Do not rely on the server's
+    // runtime timezone when deciding whether the 10:00 cutoff has passed.
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Makassar",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).formatToParts(new Date());
+
+    const hour = Number(parts.find(p => p.type === "hour")?.value || 0);
+    const minute = Number(parts.find(p => p.type === "minute")?.value || 0);
+    if (hour < 10) return null;
+
     const snapshot = await db.collection("parkir").where("status", "==", "Masuk").get();
     if (snapshot.empty) return null;
+
     const batch = db.batch();
-    snapshot.forEach(docSnap => batch.update(docSnap.ref, { status: "Keluar", waktuKeluar: Date.now() }));
+    const waktuKeluar = Date.now();
+    snapshot.forEach(docSnap => {
+      batch.update(docSnap.ref, { status: "Keluar", waktuKeluar });
+    });
     await batch.commit();
     return null;
   }
