@@ -1,15 +1,15 @@
 {
   "appName": "PARKIR MOBIL TAMU",
   "packageName": "com.parkiranmobiltamu.app",
-  "latestVersionCode": 4,
-  "latestVersionName": "1.2.1",
+  "latestVersionCode": 5,
+  "latestVersionName": "1.2.2",
   "minimumVersionCode": 1,
   "mandatory": false,
-  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.1/parkir-mobil-tamu-v1.2.1-debug.apk",
-  "sha256": "9ce823e43e6966d5f8aff803b528541c06fa3195dfdd346a4e5ff6de1711af1d",
+  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.2/parkir-mobil-tamu-v1.2.2-debug.apk",
+  "sha256": "5a542d00c845d46f2d577fe6565613a49e363f22c904635220cc110eacc782ac",
   "changelog": [
-    "Visitor sekarang dapat dilihat oleh admin.",
-    "Visitor dapat dihapus satu per satu atau sekaligus.",
-    "Penyelarasan VersionName 1.1.0 dan VersionCode 2."
+    "Perbaikan kamera Android dengan fallback ke Kamera sistem.",
+    "Perbaikan jalur foto galeri dan kamera saat plugin native gagal.",
+    "VersionName 1.2.2 dan VersionCode 5."
   ]
 }
