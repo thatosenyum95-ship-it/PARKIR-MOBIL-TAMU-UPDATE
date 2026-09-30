@@ -1040,60 +1040,106 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-window.takeVehiclePhoto = async function(slot, source="CAMERA"){
-  try{
-    let dataUrl="";
+async function pickPhotoFromHtmlInput(source="CAMERA"){
+  return await new Promise(resolve=>{
+    const input=document.createElement("input");
+    input.type="file";
+    input.accept="image/*";
+    if(source !== "PHOTOS") input.capture="environment";
 
-    if(source !== "PHOTOS" && NativeCamera){
+    let finished=false;
+    const finish=(value="")=>{
+      if(finished) return;
+      finished=true;
+      input.onchange=null;
+      input.oncancel=null;
+      resolve(value);
+    };
+
+    input.onchange=async ()=>{
+      try{
+        const file=input.files?.[0];
+        if(!file){ finish(""); return; }
+
+        const dataUrl=await new Promise((res,rej)=>{
+          const reader=new FileReader();
+          reader.onload=()=>res(reader.result);
+          reader.onerror=rej;
+          reader.readAsDataURL(file);
+        });
+        finish(dataUrl || "");
+      }catch(err){
+        console.error("HTML file camera gagal:",err);
+        finish("");
+      }
+    };
+
+    input.oncancel=()=>finish("");
+    document.body.appendChild(input);
+    input.click();
+
+    // Jangan biarkan elemen input tertinggal di DOM.
+    setTimeout(()=>{ try{ input.remove(); }catch(e){} }, 60000);
+  });
+}
+
+async function capturePhoto(source="CAMERA"){
+  const useCamera = source !== "PHOTOS";
+
+  // Jalur utama: plugin Camera native Capacitor.
+  if(NativeCamera){
+    if(useCamera){
       const allowed = await requestCameraPermission();
-      if(!allowed) return;
+      if(!allowed) return "";
     }
 
-    if(NativeCamera){
+    try{
       const photo=await NativeCamera.getPhoto({
         quality:72,
         width:1280,
         height:1280,
         correctOrientation:true,
-        source: source === "PHOTOS" ? "PHOTOS" : "CAMERA",
+        source:useCamera ? "CAMERA" : "PHOTOS",
         resultType:"dataUrl"
       });
-      dataUrl=photo?.dataUrl || "";
-    }else{
-      const input=document.createElement("input");
-      input.type="file";
-      input.accept="image/*";
-      if(source !== "PHOTOS") input.capture="environment";
-      input.click();
-      await new Promise(resolve=>input.onchange=resolve);
-      const file=input.files?.[0];
-      if(file){
-        dataUrl=await new Promise((resolve,reject)=>{
-          const reader=new FileReader();
-          reader.onload=()=>resolve(reader.result);
-          reader.onerror=reject;
-          reader.readAsDataURL(file);
-        });
-      }
+
+      if(photo?.dataUrl) return photo.dataUrl;
+      console.warn("Camera.getPhoto tidak mengembalikan dataUrl.");
+    }catch(err){
+      const msg=String(err?.message || err || "");
+      console.warn("Camera plugin gagal, mencoba fallback:", err);
+
+      // Cancel dari pengguna bukan kegagalan dan tidak perlu fallback.
+      if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return "";
+    }
+  }
+
+  // Fallback: file input Android/WebView. Ini dipakai bila plugin native
+  // gagal membuka kamera/galeri, sehingga aplikasi tidak berhenti di error.
+  return await pickPhotoFromHtmlInput(source);
+}
+
+window.takeVehiclePhoto = async function(slot, source="CAMERA"){
+  try{
+    const dataUrl=await capturePhoto(source);
+    if(!dataUrl){
+      console.warn("Tidak ada foto yang dipilih/diambil.");
+      return;
     }
 
-    if(!dataUrl) return;
-    dataUrl=await compressPhotoDataUrl(dataUrl,1000,0.65);
+    const compressed=await compressPhotoDataUrl(dataUrl,1000,0.65);
 
     const field=document.getElementById("foto"+slot);
     const img=document.getElementById("photoImg"+slot);
     const preview=document.getElementById("photoPreview"+slot);
     const retake=document.getElementById("retakeBtn"+slot);
 
-    field.value=dataUrl;
-    img.src=dataUrl;
+    field.value=compressed;
+    img.src=compressed;
     preview.style.display="block";
     retake.style.display="block";
 
     if(slot===1){
-      // Setelah kamera ditutup, tetap di sesi ADMIN dan kembali ke form utama.
-      // Jangan memanggil location.reload()/goHome() di sini karena foto yang baru
-      // diambil masih berada di memori form dan harus langsung dipakai.
       document.getElementById("cameraBtn1").innerText=source === "PHOTOS" ? "🖼️ FOTO 1 DARI GALERI" : "📸 FOTO MOBIL 1 SUDAH DIAMBIL";
       document.getElementById("galleryBtn1").innerText="🖼️ GANTI FOTO DARI GALERI";
       document.getElementById("dataFields").style.display="block";
@@ -1103,12 +1149,12 @@ window.takeVehiclePhoto = async function(slot, source="CAMERA"){
   }catch(err){
     console.error("Media foto gagal:",err);
     const msg=String(err?.message || err || "");
-    // Menekan tombol kembali/cancel di kamera atau galeri bukan error.
     if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return;
-    if(source === "PHOTOS") {
-      alert("Galeri tidak bisa dibuka. Pastikan izin foto/media diberikan.");
+
+    if(source === "PHOTOS"){
+      alert("Galeri tidak bisa dibuka. Coba lagi atau pilih foto dari Galeri HP.");
     }else{
-      alert("Kamera tidak bisa dibuka. Pastikan izin kamera diberikan.");
+      alert("Kamera tidak bisa dibuka. Coba lagi. Jika tetap gagal, buka Pengaturan Android → Aplikasi → PARKIR MOBIL TAMU → Izin → Kamera.");
     }
     applyAdminSession();
   }
