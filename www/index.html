@@ -797,8 +797,7 @@ window.deleteVisitor=async function(visitorId){
   }
   if(!visitorId) return;
 
-  const target = visitorDocs.find(item=>item.id===visitorId);
-  const waktu = target?.data?.time
+  const target = visitorDocs.find(item=>item.id===visitorId);  const waktu = target?.data?.time
     ? new Date(Number(target.data.time)).toLocaleString("id-ID")
     : "visitor ini";
 
@@ -1597,8 +1596,7 @@ window.editDataById=function(id){
   document.getElementById("editFotoLink2").value=links[1]||"";
   editingFoto1=foto[0]||""; editingFoto2=foto[1]||"";
   [1,2].forEach(i=>{ const im=document.getElementById("editPreview"+i); const src=i===1?editingFoto1:editingFoto2; im.src=src||""; im.style.display=src?"block":"none"; });
-  document.getElementById("editOverlay").style.display="block";
-};
+  document.getElementById("editOverlay").style.display="block";};
 
 window.closeEditData=function(){
   editingId=null; editingFoto1=""; editingFoto2="";
@@ -1730,34 +1728,26 @@ imgFull.addEventListener("wheel", (e)=>{
   imgFull.style.transform = `scale(${zoom})`;
 });
 window.ANA = {
+  active:false,
+  native:!!NativeSpeechRecognition,
+  restartTimer:null,
+  starting:false,
 
-  active: false,
-  native: !!NativeSpeechRecognition,
-  restartTimer: null,
-  starting: false,
-
-  // 🔊 SUARA ANA — native Android jika tersedia, Web Speech sebagai fallback
   async speak(text){
     try{
       if(NativeSpeechSynthesis){
         await NativeSpeechSynthesis.speak({
-          text,
-          language: "id-ID",
-          rate: 1.0,
-          pitch: 1.0,
-          volume: 1.0,
-          queueStrategy: "Flush"
+          text, language:"id-ID", rate:1.0, pitch:1.0, volume:1.0,
+          queueStrategy:"Flush"
         });
         return;
       }
-    }catch(err){
-      console.warn("Native TTS gagal, memakai fallback:", err);
-    }
+    }catch(err){ console.warn("Native TTS gagal:",err); }
 
     if("speechSynthesis" in window){
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = "id-ID";
-      msg.rate = 1;
+      const msg=new SpeechSynthesisUtterance(text);
+      msg.lang="id-ID";
+      msg.rate=1;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(msg);
     }
@@ -1765,205 +1755,237 @@ window.ANA = {
 
   async start(){
     if(this.active) return;
-
-    // 📱 APK Android: gunakan native SpeechRecognizer, bukan Web Speech API WebView.
     if(this.native){
       try{
-        const permission = await NativeSpeechRecognition.requestPermissions();
-        if(permission?.speechRecognition !== "granted"){
+        const permission=await NativeSpeechRecognition.requestPermissions();
+        if(permission?.speechRecognition!=="granted"){
           alert("Izin mikrofon belum diberikan. Silakan izinkan mikrofon untuk ANA.");
           return;
         }
-
-        const available = await NativeSpeechRecognition.available();
+        const available=await NativeSpeechRecognition.available();
         if(!available?.available){
           alert("Fitur pengenalan suara tidak tersedia di perangkat ini.");
           return;
         }
-
-        this.active = true;
+        this.active=true;
         await this.speak("ANA aktif");
         this._nativeListen();
         return;
       }catch(err){
-        console.error("ANA native error:", err);
-        this.active = false;
+        console.error("ANA native error:",err);
+        this.active=false;
         alert("ANA gagal dimulai. Pastikan mikrofon dan layanan suara Android aktif.");
         return;
       }
     }
 
-    // 🌐 Fallback jika aplikasi dijalankan di browser biasa.
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SpeechRecognition){
       alert("Browser tidak mendukung pengenalan suara.");
       return;
     }
-
-    this.active = true;
-    this._webRecognition = new SpeechRecognition();
-    this._webRecognition.lang = "id-ID";
-    this._webRecognition.continuous = false;
-    this._webRecognition.interimResults = false;
-
-    this._webRecognition.onresult = (e)=>{
-      const text = e.results?.[0]?.[0]?.transcript || "";
-      console.log("🎤 RAW:", text);
+    this.active=true;
+    this._webRecognition=new SpeechRecognition();
+    this._webRecognition.lang="id-ID";
+    this._webRecognition.continuous=false;
+    this._webRecognition.interimResults=false;
+    this._webRecognition.onresult=(e)=>{
+      const text=e.results?.[0]?.[0]?.transcript||"";
+      console.log("🎤 RAW:",text);
       if(text) this.process(text);
     };
-
-    this._webRecognition.onend = ()=>{
+    this._webRecognition.onend=()=>{
       if(this.active){
-        setTimeout(()=>{
-          try{ this._webRecognition.start(); }catch(e){}
-        }, 400);
+        setTimeout(()=>{try{this._webRecognition.start();}catch(e){}},400);
       }
     };
-
     try{
       this._webRecognition.start();
       await this.speak("ANA aktif");
     }catch(err){
-      this.active = false;
+      this.active=false;
       alert("Mikrofon tidak dapat dimulai.");
     }
   },
 
   async _nativeListen(){
-    if(!this.active || this.starting || !NativeSpeechRecognition) return;
-    this.starting = true;
-
+    if(!this.active||this.starting||!NativeSpeechRecognition) return;
+    this.starting=true;
     try{
-      const result = await NativeSpeechRecognition.start({
-        language: "id-ID",
-        maxResults: 3,
-        partialResults: false,
-        popup: false
+      const result=await NativeSpeechRecognition.start({
+        language:"id-ID", maxResults:3, partialResults:false, popup:false
       });
-
-      const text = result?.matches?.[0] || "";
-      console.log("🎤 NATIVE RAW:", text);
-      if(this.active && text) this.process(text);
+      const text=result?.matches?.[0]||"";
+      console.log("🎤 NATIVE RAW:",text);
+      if(this.active&&text) this.process(text);
     }catch(err){
-      console.warn("ANA recognition:", err);
+      console.warn("ANA recognition:",err);
     }finally{
-      this.starting = false;
+      this.starting=false;
       if(this.active){
         clearTimeout(this.restartTimer);
-        this.restartTimer = setTimeout(()=>this._nativeListen(), 350);
+        this.restartTimer=setTimeout(()=>this._nativeListen(),350);
       }
     }
   },
 
   async stop(){
-    this.active = false;
-    this.starting = false;
+    this.active=false;
+    this.starting=false;
     clearTimeout(this.restartTimer);
-
     try{
       if(NativeSpeechRecognition){
-        if(NativeSpeechRecognition.forceStop) await NativeSpeechRecognition.forceStop({timeout: 1200});
+        if(NativeSpeechRecognition.forceStop) await NativeSpeechRecognition.forceStop({timeout:1200});
         else await NativeSpeechRecognition.stop();
       }
-    }catch(err){
-      console.warn("Stop ANA:", err);
-    }
-
-    try{
-      if(this._webRecognition) this._webRecognition.stop();
-    }catch(e){}
-
+    }catch(err){ console.warn("Stop ANA:",err); }
+    try{ if(this._webRecognition) this._webRecognition.stop(); }catch(e){}
     await this.speak("ANA dimatikan");
   },
 
   normalize(text){
-    return text
+    return String(text||"")
       .toLowerCase()
       .trim()
       .replace(/\s+/g," ")
+      .replace(/\b(i a|ia|yana|ana)\b/g,"ana")
       .replace(/kmar/g,"kamar")
+      .replace(/kamar\s+/g,"kamar ")
       .replace(/keluarin/g,"keluar")
+      .replace(/keluar\s+semua/g,"keluar semua")
       .replace(/ckout/g,"checkout")
       .replace(/ckot/g,"checkout");
   },
 
   extractNumber(text){
-    const match = text.match(/\d+/);
-    return match ? match[0] : "";
+    const match=String(text||"").match(/\d+/);
+    return match?match[0]:"";
+  },
+
+  setFilter(filter){
+    if(filter==="masuk") filterMasuk();
+    else if(filter==="keluar") filterKeluar();
+    else filterSemua();
+  },
+
+  findData(target, allowStatus=true){
+    const t=String(target||"").toLowerCase().trim();
+    if(!t) return null;
+    const num=this.extractNumber(t);
+    return allData.find(d=>{
+      const nama=String(d.nama||"").toLowerCase();
+      const kamar=String(d.kamar||"").toLowerCase();
+      const plat=Array.isArray(d.plat)?d.plat:[d.plat||""];
+      const posisi=Array.isArray(d.posisi)?d.posisi:[d.posisi||""];
+      const values=[nama,kamar,...plat,...posisi].map(v=>String(v||"").toLowerCase());
+      return values.some(v=>v.includes(t)) || (!!num && kamar.includes(num)) ||
+        (allowStatus && String(d.status||"").toLowerCase()===t);
+    });
   },
 
   process(text){
-    text = this.normalize(text);
-    console.log("🧠 NORMALIZED:", text);
+    text=this.normalize(text);
+    console.log("🧠 ANA:",text);
 
-    let action = "unknown";
-    let target = "";
+    // Perintah filter tampilan.
+    if(/\b(tampilkan|lihat|filter|lihatkan)\b.*\b(masuk|yang masuk)\b/.test(text)){
+      this.setFilter("masuk");
+      this.speak("Menampilkan kendaraan yang masih masuk");
+      return;
+    }
+    if(/\b(tampilkan|lihat|filter|lihatkan)\b.*\b(keluar|yang keluar)\b/.test(text)){
+      this.setFilter("keluar");
+      this.speak("Menampilkan kendaraan yang sudah keluar");
+      return;
+    }
+    if(/\b(tampilkan|lihat|filter|lihatkan)\b.*\b(semua|seluruh)\b/.test(text)){
+      this.setFilter("semua");
+      this.speak("Menampilkan semua data");
+      return;
+    }
 
-    if(
-      text.includes("checkout") ||
-      text.includes("check out") ||
-      text.includes("keluar")
-    ){
-      action = "checkout";
-      target = text
-        .replace("checkout","")
-        .replace("check out","")
-        .replace("keluar","")
-        .replace("kamar","")
+    // Pencarian suara: "cari Budi", "cari kamar 101", "cari B 1234 ABC".
+    if(/^(ana\s+)?(cari|search)\b/.test(text)){
+      const target=text.replace(/^(ana\s+)?(cari|search)\s*/,"").trim();
+      search.value=target;
+      searchValue=target;
+      render();
+      if(target){
+        const count=allData.filter(d=>{
+          const values=[d.nama,d.kamar,d.status,
+            ...(Array.isArray(d.plat)?d.plat:[d.plat]),
+            ...(Array.isArray(d.posisi)?d.posisi:[d.posisi])
+          ].filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase();
+          return values.includes(target);
+        }).length;
+        this.speak(count?("Ditemukan "+count+" data untuk "+target):"Data tidak ditemukan");
+      }else{
+        this.speak("Pencarian dikosongkan");
+      }
+      return;
+    }
+
+    // Bersihkan pencarian suara.
+    if(/\b(bersihkan|hapus|reset)\b.*\b(cari|pencarian|filter)\b/.test(text)){
+      search.value="";
+      searchValue="";
+      filterSemua();
+      this.speak("Filter dan pencarian sudah dibersihkan");
+      return;
+    }
+
+    let action="unknown",target="";
+    if(text.includes("checkout")||text.includes("check out")||text.includes("keluar")){
+      action="checkout";
+      target=text
+        .replace(/checkout/g,"")
+        .replace(/check out/g,"")
+        .replace(/keluar/g,"")
+        .replace(/kamar/g,"")
+        .replace(/ana/g,"")
         .trim();
-    }
-    else if(text.includes("masuk")){
-      action = "masuk";
-      target = text.replace("masuk","").replace("kamar","").trim();
+    }else if(text.includes("masuk")){
+      action="masuk";
+      target=text.replace(/masuk/g,"").replace(/kamar/g,"").replace(/ana/g,"").trim();
     }
 
-    console.log("📦 ACTION:", action, "TARGET:", target);
-    this.execute(action, target);
+    this.execute(action,target);
   },
 
-  execute(action, target){
-    if(action === "checkout"){
-      const data = allData.find(d => {
-        const nama = (d.nama || "").toLowerCase();
-        const kamar = (d.kamar || "").toLowerCase();
-        const t = target.toLowerCase();
-        const num = this.extractNumber(t);
-        const matchKamar = num ? kamar.includes(num) : false;
-        const matchNama = nama.includes(t);
-        return matchNama || matchKamar;
-      });
-
+  async execute(action,target){
+    if(action==="checkout"){
+      const data=this.findData(target,false);
       if(!data){
-        this.speak("Data tidak ditemukan");
+        await this.speak("Data tidak ditemukan");
         return;
       }
-
-      updateDoc(doc(db,"parkir",data.id),{
-        status:"Keluar",
-        waktuKeluar:Date.now()
-      });
-
-      this.speak(`Siap, ANA laksanakan checkout ${data.nama} kamar ${data.kamar}`);
-    }
-    else if(action === "masuk"){
-      const data = allData.find(d => {
-        const nama = (d.nama || "").toLowerCase();
-        const kamar = (d.kamar || "").toLowerCase();
-        const t = target.toLowerCase();
-        const num = this.extractNumber(t);
-        return nama.includes(t) || (num && kamar.includes(num));
-      });
-
-      if(!data){
-        this.speak("Data tidak ditemukan");
+      if(data.status!=="Masuk"){
+        await this.speak(data.nama+" sudah berstatus keluar");
         return;
       }
+      try{
+        await updateDoc(doc(db,"parkir",data.id),{
+          status:"Keluar", waktuKeluar:Date.now(), warning:false
+        });
+        await this.speak("Siap, checkout "+data.nama+" kamar "+data.kamar);
+      }catch(err){
+        console.error("ANA checkout gagal:",err);
+        await this.speak("Checkout gagal. Periksa koneksi.");
+      }
+      return;
+    }
 
-      this.speak(`Data masuk ${data.nama} kamar ${data.kamar}`);
+    if(action==="masuk"){
+      const data=this.findData(target,false);
+      if(!data){
+        await this.speak("Data tidak ditemukan");
+        return;
+      }
+      await this.speak("Data "+data.nama+" kamar "+data.kamar+" berstatus "+data.status);
+      return;
     }
-    else {
-      this.speak("Perintah tidak dikenal");
-    }
+
+    await this.speak("Perintah tidak dikenal");
   }
 };
 window.addEventListener("load", function () {
