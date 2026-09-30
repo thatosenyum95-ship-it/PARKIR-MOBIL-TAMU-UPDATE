@@ -6,7 +6,7 @@
   "minimumVersionCode": 1,
   "mandatory": false,
   "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.5/parkir-mobil-tamu-v1.2.5-debug.apk",
-  "sha256": "424c18fde1402952508055ec865fd372654726db25e7e5928069773dbd943103",
+  "sha256": "315f864d5d7ad570ac82791175ca20aec371ea955652c9631810daaad135c8c2",
   "changelog": [
     "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
     "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
