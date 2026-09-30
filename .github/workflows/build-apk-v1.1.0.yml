@@ -608,6 +608,33 @@ jobs:
           grep -q "@PluginMethod()" "$FILE"
           echo "AppUpdater source OK."
 
+      - name: Register native AppUpdater plugin
+        shell: bash
+        run: |
+          set -e
+          MAIN_DIR="android/app/src/main/java/com/parkiranmobiltamu/app"
+          MAIN_ACTIVITY="$MAIN_DIR/MainActivity.java"
+          test -f "$MAIN_ACTIVITY"
+
+          cat > "$MAIN_ACTIVITY" <<'JAVA'
+          package com.parkiranmobiltamu.app;
+
+          import android.os.Bundle;
+
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(AppUpdater.class);
+                  super.onCreate(savedInstanceState);
+              }
+          }
+          JAVA
+
+          grep -q "registerPlugin(AppUpdater.class)" "$MAIN_ACTIVITY"
+          echo "AppUpdater plugin registration: OK"
+
       - name: Set app version
         shell: bash
         run: |
@@ -620,10 +647,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 9", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 10", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.7"',
+              'versionName "1.2.8"',
               text,
               count=1
           )
@@ -680,8 +707,8 @@ jobs:
           file_paths = Path("android/app/src/main/res/xml/file_paths.xml").read_text()
           if "external-files-path" not in file_paths:
               raise SystemExit("FileProvider external-files-path untuk Camera tidak ditemukan")
-          if 'const APP_VERSION_CODE = 9;' not in js:
-              raise SystemExit("APP_VERSION_CODE bukan 9")
+          if 'const APP_VERSION_CODE = 10;' not in js:
+              raise SystemExit("APP_VERSION_CODE bukan 10")
           if 'const APP_VERSION_NAME = "1.2.7";' not in js:
               raise SystemExit("APP_VERSION_NAME bukan 1.2.7")
           print("Camera + ANA + permissions + FileProvider + version validation: OK")
