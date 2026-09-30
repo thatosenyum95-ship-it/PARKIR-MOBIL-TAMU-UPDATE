@@ -756,8 +756,9 @@ jobs:
               "downloadUrl": "${RELEASE_URL}",
               "sha256": "${SHA256}",
               "changelog": [
-                  "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
-                  "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
+                  "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
+                  "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
+                  "Kamera dipertahankan mengikuti APK lama yang sudah bekerja.",
                   "VersionName 1.2.7 dan VersionCode 9."
               ]
           }
