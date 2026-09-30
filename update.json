@@ -1,16 +1,16 @@
 {
   "appName": "PARKIR MOBIL TAMU",
   "packageName": "com.parkiranmobiltamu.app",
-  "latestVersionCode": 9,
-  "latestVersionName": "1.2.7",
+  "latestVersionCode": 10,
+  "latestVersionName": "1.2.8",
   "minimumVersionCode": 1,
   "mandatory": false,
-  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.7/parkir-mobil-tamu-v1.2.7-debug.apk",
-  "sha256": "bbd35fee1062f82cafad8f2abd2754994c5a46f5d36138c3b2709e050ebc94ab",
+  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.8/parkir-mobil-tamu-v1.2.7-debug.apk",
+  "sha256": "f47c2387392c655d215144489418d7759b3508fa46fa062628befda24e44a4a6",
   "changelog": [
     "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
     "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
     "Kamera dipertahankan mengikuti APK lama yang sudah bekerja.",
-    "VersionName 1.2.7 dan VersionCode 9."
+    "VersionName 1.2.8 dan VersionCode 10."
   ]
 }
