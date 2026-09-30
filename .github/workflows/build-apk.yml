@@ -147,6 +147,33 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
+      - name: Verify built APK resources
+        shell: bash
+        run: |
+          set -e
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          rm -rf /tmp/apk_verify
+          mkdir -p /tmp/apk_verify
+          unzip -q "$APK" -d /tmp/apk_verify
+
+          # Android 8+ must not have the generated adaptive-icon XMLs,
+          # otherwise Samsung/Android can still show the Capacitor default icon.
+          test ! -e /tmp/apk_verify/res/mipmap-anydpi-v26/ic_launcher.xml
+          test ! -e /tmp/apk_verify/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          EXPECTED="$(sha256sum assets/icon.png | cut -d' ' -f1)"
+          for f in /tmp/apk_verify/res/mipmap-*-v4/ic_launcher.png /tmp/apk_verify/res/mipmap-*-v4/ic_launcher_round.png; do
+            test -f "$f"
+            ACTUAL="$(sha256sum "$f" | cut -d' ' -f1)"
+            test "$ACTUAL" = "$EXPECTED"
+          done
+
+          test -f /tmp/apk_verify/res/drawable/cek_var_icon.png
+          test -f /tmp/apk_verify/res/drawable/push_icon.png
+          test -f /tmp/apk_verify/res/raw/notif.wav
+          echo "APK resource verification OK."
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
