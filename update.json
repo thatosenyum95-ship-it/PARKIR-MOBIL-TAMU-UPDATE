@@ -5,8 +5,8 @@
   "latestVersionName": "1.2.8",
   "minimumVersionCode": 1,
   "mandatory": false,
-  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.8/parkir-mobil-tamu-v1.2.7-debug.apk",
-  "sha256": "f47c2387392c655d215144489418d7759b3508fa46fa062628befda24e44a4a6",
+  "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.8/parkir-mobil-tamu-v1.2.8-debug.apk",
+  "sha256": "1eb2f9d09253a9c70614055a8657c0752e2d1ebfd60a7244aa15a184c9d9a273",
   "changelog": [
     "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
     "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
