@@ -1022,50 +1022,24 @@ async function capturePhoto(source="CAMERA"){
   const mode = source === "PHOTOS" ? "PHOTOS" : "CAMERA";
 
   if(!NativeCamera || typeof NativeCamera.getPhoto !== "function"){
-    throw new Error("Plugin kamera native tidak tersedia");
+    console.error("Plugin Camera native tidak tersedia.");
+    return "";
   }
 
   try{
-    // Tombol KAMERA hanya membuka kamera.
-    // Tombol GALERI hanya membuka galeri.
-    // Tidak ada fallback silang ke file picker.
-    if(mode === "CAMERA" && NativeCamera.checkPermissions){
-      const permission = await NativeCamera.checkPermissions();
-
-      if(permission?.camera !== "granted"){
-        if(!NativeCamera.requestPermissions){
-          throw new Error("Izin kamera belum tersedia");
-        }
-
-        const requested = await NativeCamera.requestPermissions({
-          permissions:["camera"]
-        });
-
-        if(requested?.camera !== "granted"){
-          throw new Error("Izin kamera belum diberikan");
-        }
-      }
-    }
-
+    // Mengikuti pola kamera dari APK lama yang sudah bekerja:
+    // langsung panggil Camera.getPhoto() tanpa checkPermissions/requestPermissions
+    // manual. Plugin Capacitor menangani alur permission Android.
     const photo = await NativeCamera.getPhoto({
       quality:72,
       width:1280,
       height:1280,
       correctOrientation:true,
       source:mode,
-      resultType:"dataUrl",
-      saveToGallery:false
+      resultType:"dataUrl"
     });
 
-    if(!photo?.dataUrl){
-      throw new Error(
-        mode === "CAMERA"
-          ? "Kamera tidak mengembalikan foto"
-          : "Galeri tidak mengembalikan foto"
-      );
-    }
-
-    return photo.dataUrl;
+    return photo?.dataUrl || "";
   }catch(err){
     console.error(
       mode === "CAMERA"
@@ -1073,7 +1047,7 @@ async function capturePhoto(source="CAMERA"){
         : "Galeri native gagal:",
       err
     );
-    throw err;
+    return "";
   }
 }
 
@@ -1081,7 +1055,9 @@ window.takeVehiclePhoto = async function(slot, source="CAMERA"){
   try{
     const dataUrl=await capturePhoto(source);
     if(!dataUrl){
-      console.warn("Tidak ada foto yang dipilih/diambil.");
+      // Tidak menampilkan alert/error panjang ke pengguna.
+      // Tombol KAMERA tetap khusus kamera dan GALERI tetap khusus galeri.
+      applyAdminSession();
       return;
     }
 
@@ -1106,14 +1082,6 @@ window.takeVehiclePhoto = async function(slot, source="CAMERA"){
     }
   }catch(err){
     console.error("Media foto gagal:",err);
-    const msg=String(err?.message || err || "");
-    if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return;
-
-    if(source === "PHOTOS"){
-      alert("Galeri tidak bisa dibuka. Coba lagi atau pilih foto dari Galeri HP.");
-    }else{
-      alert("Kamera tidak bisa dibuka. Coba lagi. Jika tetap gagal, buka Pengaturan Android → Aplikasi → PARKIR MOBIL TAMU → Izin → Kamera.");
-    }
     applyAdminSession();
   }
 };
