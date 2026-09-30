@@ -785,16 +785,13 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add update.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Update release manifest to ${VERSION_NAME} [skip ci]"
-          fi
 
           # Main may receive a commit while this workflow is building.
           # Start from the latest main before creating the manifest commit.
-          # This avoids update.json rebase conflicts between concurrent runs.
+          # Write update.json AFTER the reset so the generated manifest is not discarded.
           git fetch origin main
           git reset --hard origin/main
+
           git add update.json
           if ! git diff --cached --quiet; then
             git commit -m "Update release manifest to ${VERSION_NAME} [skip ci]"
