@@ -10,6 +10,6 @@
   "changelog": [
     "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
     "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
-    "VersionName 1.2.4 dan VersionCode 5."
+    "VersionName 1.2.4 dan VersionCode 6."
   ]
 }
