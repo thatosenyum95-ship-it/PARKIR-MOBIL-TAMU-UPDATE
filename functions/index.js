@@ -51,35 +51,36 @@ exports.sendAnnouncementPush = onDocumentCreated("pengumuman/{docId}", async (ev
 
 exports.autoCheckoutAtTen = onSchedule(
   {
-    schedule: "every 1 minutes",
+    // Tepat pukul 10:00 WIB setiap hari.
+    schedule: "0 10 * * *",
     timeZone: "Asia/Jakarta",
     region: "asia-southeast2"
   },
   async () => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
-    }).formatToParts(new Date());
-    const hour = Number(parts.find(p => p.type === "hour")?.value || 0);
-    if (hour < 10) return;
-
     const snapshot = await db.collection("parkir")
       .where("status", "==", "Masuk")
       .get();
 
-    if (snapshot.empty) return;
+    if (snapshot.empty) {
+      logger.info("Auto checkout 10:00 WIB: tidak ada kendaraan Masuk.");
+      return;
+    }
 
     const batch = db.batch();
     let count = 0;
+    const checkoutTime = Date.now();
 
     snapshot.forEach((docSnap) => {
       batch.update(docSnap.ref, {
         status: "Keluar",
-        waktuKeluar: Date.now()
+        waktuKeluar: checkoutTime,
+        warning: false,
+        autoCheckout: true
       });
       count++;
     });
 
     await batch.commit();
-    logger.info("Auto checkout server-side selesai", { count });
+    logger.info("Auto checkout 10:00 WIB selesai", { count });
   }
 );
