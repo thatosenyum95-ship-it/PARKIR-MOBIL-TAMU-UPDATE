@@ -616,10 +616,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 6", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 7", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.4"',
+              'versionName "1.2.5"',
               text,
               count=1
           )
@@ -664,9 +664,9 @@ jobs:
               raise SystemExit("capturePhoto tidak ditemukan")
           if "file input" in js.lower() or "jalur kamera fallback" in js.lower():
               raise SystemExit("Fallback file picker/kamera terdeteksi")
-          if 'const APP_VERSION_CODE = 6;' not in js:
+          if 'const APP_VERSION_CODE = 7;' not in js:
               raise SystemExit("APP_VERSION_CODE bukan 6")
-          if 'const APP_VERSION_NAME = "1.2.4";' not in js:
+          if 'const APP_VERSION_NAME = "1.2.5";' not in js:
               raise SystemExit("APP_VERSION_NAME bukan 1.2.4")
           print("Camera flow dan version constants: OK")
           PY
@@ -704,21 +704,21 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.4-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.5-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.4-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.4-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.5-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.5-debug.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.4-debug-apk
+          name: parkir-mobil-tamu-v1.2.5-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.4-debug.apk
-            dist/parkir-mobil-tamu-v1.2.4-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.5-debug.apk
+            dist/parkir-mobil-tamu-v1.2.5-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -728,12 +728,12 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.4"
-          VERSION_CODE="6"
-          APK="dist/parkir-mobil-tamu-v1.2.4-debug.apk"
+          VERSION_NAME="1.2.5"
+          VERSION_CODE="7"
+          APK="dist/parkir-mobil-tamu-v1.2.5-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.4-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.5-debug.apk"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
@@ -760,7 +760,7 @@ jobs:
               "changelog": [
                   "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
                   "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
-                  "VersionName 1.2.4 dan VersionCode 5."
+                  "VersionName 1.2.5 dan VersionCode 7."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
