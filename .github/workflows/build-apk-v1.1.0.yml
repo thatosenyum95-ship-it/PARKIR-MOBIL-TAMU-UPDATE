@@ -651,7 +651,7 @@ jobs:
           import re
 
           html = Path("www/index.html").read_text()
-          match = re.search(r'<script type="module">\\s*(.*?)\\s*</script>', html, re.S)
+          match = re.search(r'<script type="module">\s*(.*?)\s*</script>', html, re.S)
           if not match:
               raise SystemExit("Script module utama tidak ditemukan")
 
