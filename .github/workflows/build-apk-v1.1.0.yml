@@ -759,6 +759,15 @@ jobs:
               --notes "PARKIR MOBIL TAMU VersionName ${VERSION_NAME}, VersionCode ${VERSION_CODE}."
           fi
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Main may receive a commit while this workflow is building.
+          # Start from the latest main BEFORE generating update.json.
+          # This prevents the reset from discarding the generated manifest.
+          git fetch origin main
+          git reset --hard origin/main
+
           python3 <<PY
           import json
           from pathlib import Path
@@ -782,15 +791,6 @@ jobs:
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
           PY
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Main may receive a commit while this workflow is building.
-          # Start from the latest main before creating the manifest commit.
-          # Write update.json AFTER the reset so the generated manifest is not discarded.
-          git fetch origin main
-          git reset --hard origin/main
 
           git add update.json
           if ! git diff --cached --quiet; then
