@@ -1737,7 +1737,11 @@ window.ANA = {
     try{
       if(NativeSpeechSynthesis){
         await NativeSpeechSynthesis.speak({
-          text, language:"id-ID", rate:1.0, pitch:1.0, volume:1.0,
+          text,
+          language:"id-ID",
+          rate:0.88,
+          pitch:1.12,
+          volume:0.92,
           queueStrategy:"Flush"
         });
         return;
@@ -1747,7 +1751,9 @@ window.ANA = {
     if("speechSynthesis" in window){
       const msg=new SpeechSynthesisUtterance(text);
       msg.lang="id-ID";
-      msg.rate=1;
+      msg.rate=0.88;
+      msg.pitch=1.12;
+      msg.volume=0.92;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(msg);
     }
