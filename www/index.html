@@ -841,12 +841,33 @@ function getCountdown(){
 let autoCheckoutRunning = false;
 let lastAutoCheckoutKey = "";
 
-async function autoSystem(){
-  const now = new Date();
-  const jam = now.getHours();
-  const menit = now.getMinutes();
+function getWibDateParts(){
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone:"Asia/Jakarta",
+    year:"numeric",
+    month:"2-digit",
+    day:"2-digit",
+    hour:"2-digit",
+    minute:"2-digit",
+    hour12:false
+  }).formatToParts(new Date());
 
-  // Peringatan 09:30.
+  const get = type => Number(parts.find(p=>p.type===type)?.value || 0);
+  return {
+    year:get("year"),
+    month:get("month"),
+    day:get("day"),
+    hour:get("hour"),
+    minute:get("minute")
+  };
+}
+
+async function autoSystem(){
+  const wib = getWibDateParts();
+  const jam = wib.hour;
+  const menit = wib.minute;
+
+  // Peringatan 09:30 WIB.
   if(jam===9 && menit>=30){
     const warningTargets = allData.filter(d=>d.status==="Masuk" && !d.warning);
     for(const d of warningTargets){
@@ -858,25 +879,27 @@ async function autoSystem(){
     }
   }
 
-  // Checkout otomatis tepat mulai 10:00 waktu lokal perangkat.
-  // Tetap dijalankan jika aplikasi dibuka setelah jam 10.
+  // Checkout otomatis berdasarkan WIB, bukan zona waktu HP.
+  // Jika aplikasi dibuka setelah 10:00 WIB, proses tetap dijalankan sekali
+  // untuk hari WIB tersebut.
   if(jam >= 10 && !autoCheckoutRunning){
-    const key = now.toISOString().slice(0,10);
+    const key = `${wib.year}-${String(wib.month).padStart(2,"0")}-${String(wib.day).padStart(2,"0")}`;
     if(lastAutoCheckoutKey !== key){
       autoCheckoutRunning = true;
       try{
         const targets = allData.filter(d=>d.status==="Masuk");
 
         if(targets.length){
+          const checkoutTime = Date.now();
           await Promise.all(targets.map(d =>
             updateDoc(doc(db,"parkir",d.id),{
               status:"Keluar",
-              waktuKeluar:Date.now(),
+              waktuKeluar:checkoutTime,
               warning:false,
               autoCheckout:true
             })
           ));
-          console.log("Auto checkout lokal selesai:", targets.length);
+          console.log("Auto checkout lokal 10:00 WIB selesai:", targets.length);
         }
 
         lastAutoCheckoutKey = key;
