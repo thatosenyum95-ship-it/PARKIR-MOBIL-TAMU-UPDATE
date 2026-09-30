@@ -452,8 +452,8 @@ const db = getFirestore(app);
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
 const APP_PACKAGE_NAME = "com.parkiranmobiltamu.app";
-const APP_VERSION_CODE = 2;
-const APP_VERSION_NAME = "1.1.0";
+const APP_VERSION_CODE = 3;
+const APP_VERSION_NAME = "1.2.0";
 const APP_UPDATE_CHANNEL_ID = "app_update";
 let updateManifestCache = null;
 
@@ -861,27 +861,60 @@ function getCountdown(){
 }
 
 /* AUTO SYSTEM */
-function autoSystem(){
+let autoCheckoutRunning = false;
+let lastAutoCheckoutKey = "";
+
+async function autoSystem(){
   const now = new Date();
   const jam = now.getHours();
   const menit = now.getMinutes();
 
-  allData.forEach(d=>{
-    if(d.status==="Masuk"){
-
-      if(jam===9 && menit===30 && !d.warning){
-        updateDoc(doc(db,"parkir",d.id),{warning:true});
+  // Peringatan 09:30.
+  if(jam===9 && menit>=30){
+    const warningTargets = allData.filter(d=>d.status==="Masuk" && !d.warning);
+    for(const d of warningTargets){
+      try{
+        await updateDoc(doc(db,"parkir",d.id),{warning:true});
+      }catch(err){
+        console.warn("Gagal memberi warning:", d.id, err);
       }
-
-      // Checkout jam 10:00 diproses oleh Cloud Function server-side.
-      // APK hanya menampilkan countdown/warning agar checkout tetap berjalan
-      // meskipun semua APK sedang ditutup.
-
     }
-  });
+  }
+
+  // Checkout otomatis tepat mulai 10:00 waktu lokal perangkat.
+  // Tetap dijalankan jika aplikasi dibuka setelah jam 10.
+  if(jam >= 10 && !autoCheckoutRunning){
+    const key = now.toISOString().slice(0,10);
+    if(lastAutoCheckoutKey !== key){
+      autoCheckoutRunning = true;
+      try{
+        const targets = allData.filter(d=>d.status==="Masuk");
+
+        if(targets.length){
+          await Promise.all(targets.map(d =>
+            updateDoc(doc(db,"parkir",d.id),{
+              status:"Keluar",
+              waktuKeluar:Date.now(),
+              warning:false,
+              autoCheckout:true
+            })
+          ));
+          console.log("Auto checkout lokal selesai:", targets.length);
+        }
+
+        lastAutoCheckoutKey = key;
+      }catch(err){
+        console.error("Auto checkout lokal gagal:", err);
+      }finally{
+        autoCheckoutRunning = false;
+      }
+    }
+  }
 }
 
-setInterval(render,1000); //
+autoSystem();
+setInterval(autoSystem,1000);
+setInterval(render,1000);
 /* LOGIN */
 function applyAdminSession(){
   const adminPanel = document.getElementById("adminForm");
@@ -1299,22 +1332,21 @@ function render(){
     if(mode==="masuk" && d.status!=="Masuk") return false;
     if(mode==="keluar" && d.status!=="Keluar") return false;
 
-    return (
-      (d.nama||"") +
-      (d.plat||"") +
-      (d.kamar||"")
-    ).toLowerCase().includes(searchValue);
-  })
-.filter(d=>{
-  if(mode==="masuk" && d.status!=="Masuk") return false;
-  if(mode==="keluar" && d.status!=="Keluar") return false;
+    const values = [
+      d.nama,
+      d.kamar,
+      ...(Array.isArray(d.plat) ? d.plat : [d.plat]),
+      ...(Array.isArray(d.posisi) ? d.posisi : [d.posisi]),
+      d.status
+    ];
 
-  return (
-    (d.nama||"") +
-    (d.plat||"") +
-    (d.kamar||"")
-  ).toLowerCase().includes(searchValue);
-})
+    const haystack = values
+      .filter(v=>v !== undefined && v !== null)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(searchValue);
+  })
 .forEach(d=>{
 
   if(d.status==="Masuk") masuk++; else keluar++;
