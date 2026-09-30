@@ -787,8 +787,8 @@ jobs:
             rm -rf /tmp/restore-v127
             mkdir -p /tmp/restore-v127
             gh run download 36759683542 \
-              --repo "${GITHUB_REPOSITORY}" \\
-              --name "parkir-mobil-tamu-v1.2.7-debug-apk" \\
+              --repo "${GITHUB_REPOSITORY}" \
+              --name "parkir-mobil-tamu-v1.2.7-debug-apk" \
               --dir /tmp/restore-v127
             RESTORE_APK=$(find /tmp/restore-v127 -type f -name "parkir-mobil-tamu-v1.2.7-debug.apk" | head -n 1)
             test -n "$RESTORE_APK"
