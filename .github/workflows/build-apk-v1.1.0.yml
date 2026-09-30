@@ -649,10 +649,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 10", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 11", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.8"',
+              'versionName "1.2.9"',
               text,
               count=1
           )
@@ -709,29 +709,103 @@ jobs:
           file_paths = Path("android/app/src/main/res/xml/file_paths.xml").read_text()
           if "external-files-path" not in file_paths:
               raise SystemExit("FileProvider external-files-path untuk Camera tidak ditemukan")
-          if 'const APP_VERSION_CODE = 10;' not in js:
-              raise SystemExit("APP_VERSION_CODE bukan 10")
-          if 'const APP_VERSION_NAME = "1.2.8";' not in js:
-              raise SystemExit("APP_VERSION_NAME bukan 1.2.8")
+          if 'const APP_VERSION_CODE = 11;' not in js:
+              raise SystemExit("APP_VERSION_CODE bukan 11")
+          if 'const APP_VERSION_NAME = "1.2.9";' not in js:
+              raise SystemExit("APP_VERSION_NAME bukan 1.2.9")
           print("Camera + ANA + permissions + FileProvider + version validation: OK")
           PY
 
           node --check /tmp/parkir-main.js
           echo "JavaScript syntax validation: OK"
 
-      - name: Build debug APK
+
+      - name: Prepare permanent release signing
         shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/parkir-release.jks
+          test -s android/app/parkir-release.jks
+
+          keytool -list \
+            -keystore android/app/parkir-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          echo "Permanent release keystore validated."
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+
+          signing_block = r'''
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("parkir-release.jks")
+                      storePassword System.getenv("KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+          }
+          '''
+
+          if "signingConfigs {" in text and "parkir-release.jks" not in text:
+              raise SystemExit("Existing signingConfigs detected; refusing to overwrite blindly.")
+
+          if "parkir-release.jks" not in text:
+              marker = "android {"
+              if marker not in text:
+                  raise SystemExit("android block tidak ditemukan di app/build.gradle")
+              text = text.replace(marker, signing_block.strip() + "\n\n" + marker, 1)
+
+          if "signingConfig signingConfigs.release" not in text:
+              marker = "buildTypes {"
+              if marker not in text:
+                  raise SystemExit("buildTypes block tidak ditemukan di app/build.gradle")
+              text = text.replace(
+                  marker,
+                  'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }\n        ',
+                  1
+              )
+
+          path.write_text(text)
+          PY
+
+          grep -n "parkir-release.jks\|KEYSTORE_PASSWORD\|KEY_ALIAS\|KEY_PASSWORD\|signingConfig" android/app/build.gradle
+          test -f android/app/parkir-release.jks
+
+      - name: Build signed release APK
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -e
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK=$(find android/app/build/outputs/apk/debug \
+          APK=$(find android/app/build/outputs/apk/release \
             -type f -name "*.apk" | head -n 1)
 
           test -n "$APK"
@@ -746,24 +820,24 @@ jobs:
 
           mkdir -p dist
 
-          APK=$(find android/app/build/outputs/apk/debug \
+          APK=$(find android/app/build/outputs/apk/release \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.8-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.9-release.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.8-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.8-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.9-release.apk \
+            > dist/parkir-mobil-tamu-v1.2.9-release.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.8-debug-apk
+          name: parkir-mobil-tamu-v1.2.9-release-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.8-debug.apk
-            dist/parkir-mobil-tamu-v1.2.8-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.9-release.apk
+            dist/parkir-mobil-tamu-v1.2.9-release.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -773,12 +847,12 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.8"
-          VERSION_CODE="10"
-          APK="dist/parkir-mobil-tamu-v1.2.8-debug.apk"
+          VERSION_NAME="1.2.9"
+          VERSION_CODE="11"
+          APK="dist/parkir-mobil-tamu-v1.2.9-release.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.8-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.9-release.apk"
 
           # Restore the previously verified v1.2.7 APK asset if an earlier
           # build accidentally clobbered that release asset. This keeps old
@@ -831,7 +905,7 @@ jobs:
                   "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
                   "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
                   "Kamera dipertahankan mengikuti APK lama yang sudah bekerja.",
-                  "VersionName 1.2.8 dan VersionCode 10."
+                  "VersionName 1.2.9 dan VersionCode 10."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
@@ -849,7 +923,7 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.2.8"
+          echo "Version: 1.2.9"
           echo "VersionCode: 10"
           echo "========================================"
 
