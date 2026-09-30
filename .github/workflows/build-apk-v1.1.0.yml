@@ -616,10 +616,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 4", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 5", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.1"',
+              'versionName "1.2.2"',
               text,
               count=1
           )
@@ -672,21 +672,21 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.1-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.2-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.1-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.1-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.2-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.2-debug.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.1-debug-apk
+          name: parkir-mobil-tamu-v1.2.2-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.1-debug.apk
-            dist/parkir-mobil-tamu-v1.2.1-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.2-debug.apk
+            dist/parkir-mobil-tamu-v1.2.2-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -696,12 +696,12 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.1"
-          VERSION_CODE="4"
-          APK="dist/parkir-mobil-tamu-v1.2.1-debug.apk"
+          VERSION_NAME="1.2.2"
+          VERSION_CODE="5"
+          APK="dist/parkir-mobil-tamu-v1.2.2-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.1-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.2-debug.apk"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
@@ -746,6 +746,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.1.0"
-          echo "VersionCode: 2"
+          echo "Version: 1.2.2"
+          echo "VersionCode: 5"
           echo "========================================"
