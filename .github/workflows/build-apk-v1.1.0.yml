@@ -776,7 +776,7 @@ jobs:
           APK="dist/parkir-mobil-tamu-v1.2.8-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.7-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.8-debug.apk"
 
           # Restore the previously verified v1.2.7 APK asset if an earlier
           # build accidentally clobbered that release asset. This keeps old
