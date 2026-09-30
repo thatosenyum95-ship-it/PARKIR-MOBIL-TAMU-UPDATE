@@ -1,4 +1,5 @@
 name: Build Android APK
+# Manual release verification trigger
 
 on:
   workflow_dispatch:
