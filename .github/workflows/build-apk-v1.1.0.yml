@@ -616,10 +616,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 5", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 6", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.2"',
+              'versionName "1.2.3"',
               text,
               count=1
           )
@@ -672,21 +672,21 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.2-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.3-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.2-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.2-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.3-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.3-debug.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.2-debug-apk
+          name: parkir-mobil-tamu-v1.2.3-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.2-debug.apk
-            dist/parkir-mobil-tamu-v1.2.2-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.3-debug.apk
+            dist/parkir-mobil-tamu-v1.2.3-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -696,12 +696,12 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.2"
+          VERSION_NAME="1.2.3"
           VERSION_CODE="5"
-          APK="dist/parkir-mobil-tamu-v1.2.2-debug.apk"
+          APK="dist/parkir-mobil-tamu-v1.2.3-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.2-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.3-debug.apk"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
@@ -726,9 +726,9 @@ jobs:
               "downloadUrl": "${RELEASE_URL}",
               "sha256": "${SHA256}",
               "changelog": [
-                  "Perbaikan kamera Android dengan fallback ke Kamera sistem.",
-                  "Perbaikan jalur foto galeri dan kamera saat plugin native gagal.",
-                  "VersionName 1.2.2 dan VersionCode 5."
+                  "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
+                  "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
+                  "VersionName 1.2.3 dan VersionCode 5."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
@@ -746,6 +746,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.2.2"
+          echo "Version: 1.2.3"
           echo "VersionCode: 5"
           echo "========================================"

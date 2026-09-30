@@ -452,8 +452,8 @@ const db = getFirestore(app);
 /* APP UPDATE SYSTEM */
 const APP_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/main/update.json";
 const APP_PACKAGE_NAME = "com.parkiranmobiltamu.app";
-const APP_VERSION_CODE = 5;
-const APP_VERSION_NAME = "1.2.2";
+const APP_VERSION_CODE = 6;
+const APP_VERSION_NAME = "1.2.3";
 const APP_UPDATE_CHANNEL_ID = "app_update";
 let updateManifestCache = null;
 
@@ -1039,88 +1039,63 @@ function compressPhotoDataUrl(dataUrl, maxSize=1000, quality=0.65){
   });
 }
 
-async function pickPhotoFromHtmlInput(source="CAMERA"){
-  return await new Promise(resolve=>{
-    const input=document.createElement("input");
-    input.type="file";
-    input.accept="image/*";
-    if(source !== "PHOTOS") input.capture="environment";
-
-    let finished=false;
-    const finish=(value="")=>{
-      if(finished) return;
-      finished=true;
-      input.onchange=null;
-      input.oncancel=null;
-      resolve(value);
-    };
-
-    input.onchange=async ()=>{
-      try{
-        const file=input.files?.[0];
-        if(!file){ finish(""); return; }
-
-        const dataUrl=await new Promise((res,rej)=>{
-          const reader=new FileReader();
-          reader.onload=()=>res(reader.result);
-          reader.onerror=rej;
-          reader.readAsDataURL(file);
-        });
-        finish(dataUrl || "");
-      }catch(err){
-        console.error("HTML file camera gagal:",err);
-        finish("");
-      }
-    };
-
-    input.oncancel=()=>finish("");
-    document.body.appendChild(input);
-    input.click();
-
-    // Jangan biarkan elemen input tertinggal di DOM.
-    setTimeout(()=>{ try{ input.remove(); }catch(e){} }, 60000);
-  });
-}
-
 async function capturePhoto(source="CAMERA"){
-  const useCamera = source !== "PHOTOS";
+  const mode = source === "PHOTOS" ? "PHOTOS" : "CAMERA";
 
-  // Jalur utama: plugin Camera native Capacitor.
-  // Permission sengaja tidak dijadikan gate; plugin/native Android diberi
-  // kesempatan membuka kamera terlebih dahulu.
-  if(NativeCamera?.getPhoto){
-    try{
-      const photo=await NativeCamera.getPhoto({
-        quality:72,
-        width:1280,
-        height:1280,
-        correctOrientation:true,
-        source:useCamera ? "CAMERA" : "PHOTOS",
-        resultType:"dataUrl"
-      });
-
-      if(photo?.dataUrl) return photo.dataUrl;
-      console.warn("Camera.getPhoto tidak mengembalikan dataUrl.");
-    }catch(err){
-      const msg=String(err?.message || err || "");
-      console.warn("Camera native gagal; mencoba kamera/file Android fallback:", err);
-
-      // Cancel dari pengguna bukan kegagalan.
-      if(/cancel|cancelled|canceled|user.?cancel/i.test(msg)) return "";
-    }
+  if(!NativeCamera?.getPhoto){
+    throw new Error("Plugin kamera native tidak tersedia");
   }
 
-  // Fallback penting untuk perangkat/WebView yang gagal menjalankan plugin
-  // Camera. Untuk CAMERA, capture="environment" meminta kamera belakang.
-  // Android dapat menyerahkan aksi ini ke aplikasi Kamera sistem.
   try{
-    const fallback = await pickPhotoFromHtmlInput(source);
-    if(fallback) return fallback;
-  }catch(err){
-    console.warn("Kamera/file fallback gagal:", err);
-  }
+    // Tombol KAMERA hanya membuka kamera.
+    // Tombol GALERI hanya membuka galeri.
+    // Tidak ada fallback silang ke file picker.
+    if(mode === "CAMERA" && NativeCamera.checkPermissions){
+      const permission = await NativeCamera.checkPermissions();
 
-  return "";
+      if(permission?.camera !== "granted"){
+        if(!NativeCamera.requestPermissions){
+          throw new Error("Izin kamera belum tersedia");
+        }
+
+        const requested = await NativeCamera.requestPermissions({
+          permissions:["camera"]
+        });
+
+        if(requested?.camera !== "granted"){
+          throw new Error("Izin kamera belum diberikan");
+        }
+      }
+    }
+
+    const photo = await NativeCamera.getPhoto({
+      quality:72,
+      width:1280,
+      height:1280,
+      correctOrientation:true,
+      source:mode,
+      resultType:"dataUrl",
+      saveToGallery:false
+    });
+
+    if(!photo?.dataUrl){
+      throw new Error(
+        mode === "CAMERA"
+          ? "Kamera tidak mengembalikan foto"
+          : "Galeri tidak mengembalikan foto"
+      );
+    }
+
+    return photo.dataUrl;
+  }catch(err){
+    console.error(
+      mode === "CAMERA"
+        ? "Kamera native gagal:"
+        : "Galeri native gagal:",
+      err
+    );
+    throw err;
+  }
 }
 
 window.takeVehiclePhoto = async function(slot, source="CAMERA"){
