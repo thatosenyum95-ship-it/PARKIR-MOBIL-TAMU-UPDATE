@@ -52,12 +52,12 @@ exports.sendAnnouncementPush = onDocumentCreated("pengumuman/{docId}", async (ev
 exports.autoCheckoutAtTen = onSchedule(
   {
     schedule: "every 1 minutes",
-    timeZone: "Asia/Makassar",
+    timeZone: "Asia/Jakarta",
     region: "asia-southeast2"
   },
   async () => {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Makassar", hour: "2-digit", minute: "2-digit", hour12: false
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
     }).formatToParts(new Date());
     const hour = Number(parts.find(p => p.type === "hour")?.value || 0);
     if (hour < 10) return;
