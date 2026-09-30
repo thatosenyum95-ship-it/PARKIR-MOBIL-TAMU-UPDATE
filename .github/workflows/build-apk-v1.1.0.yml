@@ -616,10 +616,10 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          text = re.sub(r"versionCode\s+\d+", "versionCode 2", text, count=1)
+          text = re.sub(r"versionCode\s+\d+", "versionCode 4", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.1.0"',
+              'versionName "1.2.1"',
               text,
               count=1
           )
@@ -696,8 +696,8 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.0"
-          VERSION_CODE="3"
+          VERSION_NAME="1.2.1"
+          VERSION_CODE="4"
           APK="dist/parkir-mobil-tamu-v1.2.1-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
