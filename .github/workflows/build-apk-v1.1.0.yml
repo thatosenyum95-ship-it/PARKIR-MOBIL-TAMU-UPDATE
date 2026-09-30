@@ -619,7 +619,7 @@ jobs:
           text = re.sub(r"versionCode\s+\d+", "versionCode 6", text, count=1)
           text = re.sub(
               r'versionName\s+[\'"][^\'"]+[\'"]',
-              'versionName "1.2.3"',
+              'versionName "1.2.4"',
               text,
               count=1
           )
@@ -641,6 +641,38 @@ jobs:
 
           test -f android/app/src/main/res/xml/file_paths.xml
           test -f android/app/src/main/java/com/parkiranmobiltamu/app/AppUpdater.java
+
+      - name: Validate app JavaScript and camera flow
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          html = Path("www/index.html").read_text()
+          match = re.search(r'<script type="module">\\s*(.*?)\\s*</script>', html, re.S)
+          if not match:
+              raise SystemExit("Script module utama tidak ditemukan")
+
+          js = match.group(1)
+          Path("/tmp/parkir-main.js").write_text(js)
+
+          if "async async function capturePhoto" in js:
+              raise SystemExit("Sintaks capturePhoto masih mengandung async async")
+          if "async function capturePhoto" not in js:
+              raise SystemExit("capturePhoto tidak ditemukan")
+          if "file input" in js.lower() or "jalur kamera fallback" in js.lower():
+              raise SystemExit("Fallback file picker/kamera terdeteksi")
+          if 'const APP_VERSION_CODE = 6;' not in js:
+              raise SystemExit("APP_VERSION_CODE bukan 6")
+          if 'const APP_VERSION_NAME = "1.2.4";' not in js:
+              raise SystemExit("APP_VERSION_NAME bukan 1.2.4")
+          print("Camera flow dan version constants: OK")
+          PY
+
+          node --check /tmp/parkir-main.js
+          echo "JavaScript syntax validation: OK"
 
       - name: Build debug APK
         shell: bash
@@ -672,21 +704,21 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug \
             -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" dist/parkir-mobil-tamu-v1.2.3-debug.apk
+          cp "$APK" dist/parkir-mobil-tamu-v1.2.4-debug.apk
 
           sha256sum \
-            dist/parkir-mobil-tamu-v1.2.3-debug.apk \
-            > dist/parkir-mobil-tamu-v1.2.3-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.4-debug.apk \
+            > dist/parkir-mobil-tamu-v1.2.4-debug.apk.sha256
 
           ls -lh dist/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: parkir-mobil-tamu-v1.2.3-debug-apk
+          name: parkir-mobil-tamu-v1.2.4-debug-apk
           path: |
-            dist/parkir-mobil-tamu-v1.2.3-debug.apk
-            dist/parkir-mobil-tamu-v1.2.3-debug.apk.sha256
+            dist/parkir-mobil-tamu-v1.2.4-debug.apk
+            dist/parkir-mobil-tamu-v1.2.4-debug.apk.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release and update manifest
@@ -696,12 +728,12 @@ jobs:
         run: |
           set -e
 
-          VERSION_NAME="1.2.3"
-          VERSION_CODE="5"
-          APK="dist/parkir-mobil-tamu-v1.2.3-debug.apk"
+          VERSION_NAME="1.2.4"
+          VERSION_CODE="6"
+          APK="dist/parkir-mobil-tamu-v1.2.4-debug.apk"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
           TAG="v${VERSION_NAME}"
-          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.3-debug.apk"
+          RELEASE_URL="https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/${TAG}/parkir-mobil-tamu-v1.2.4-debug.apk"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "$APK" --clobber
@@ -728,7 +760,7 @@ jobs:
               "changelog": [
                   "Kamera dan galeri dipisahkan: tombol KAMERA langsung membuka kamera.",
                   "Tombol GALERI langsung membuka galeri tanpa fallback ke kamera/file picker.",
-                  "VersionName 1.2.3 dan VersionCode 5."
+                  "VersionName 1.2.4 dan VersionCode 5."
               ]
           }
           path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
@@ -746,6 +778,6 @@ jobs:
           echo "========================================"
           echo "BUILD BERHASIL"
           echo "PARKIR MOBIL TAMU"
-          echo "Version: 1.2.3"
-          echo "VersionCode: 5"
+          echo "Version: 1.2.4"
+          echo "VersionCode: 6"
           echo "========================================"
