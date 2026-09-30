@@ -9,7 +9,7 @@ initializeApp();
 const db = getFirestore();
 
 const TOPIC = "parkir_semua";
-const CHANNEL_ID = "pengumuman_fcm_v3";
+const CHANNEL_ID = "pengumuman_fcm_v4";
 
 exports.sendAnnouncementPush = onDocumentCreated("pengumuman/{docId}", async (event) => {
   const data = event.data?.data();
