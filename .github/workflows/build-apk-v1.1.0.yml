@@ -1,3 +1,4 @@
+# Permanent release signing enabled
 name: Build Android APK
 # Manual release verification trigger
 # Retry release publish after CLI argument fix
