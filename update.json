@@ -6,7 +6,7 @@
   "minimumVersionCode": 1,
   "mandatory": false,
   "downloadUrl": "https://github.com/thatosenyum95-ship-it/PARKIR-MOBIL-TAMU-UPDATE/releases/download/v1.2.7/parkir-mobil-tamu-v1.2.7-debug.apk",
-  "sha256": "5c0d8abc9dea2c1b2bc734b6fc3d4ecdacc6075ff0382ffbd95a8d8bcaf7b9e3",
+  "sha256": "bbd35fee1062f82cafad8f2abd2754994c5a46f5d36138c3b2709e050ebc94ab",
   "changelog": [
     "Auto checkout kendaraan Masuk dijalankan server pada pukul 10:00 WIB.",
     "Auto checkout lokal menggunakan zona waktu Asia/Jakarta dan tetap berjalan jika aplikasi dibuka setelah pukul 10:00 WIB.",
